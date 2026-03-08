@@ -562,18 +562,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONPATH=/app
-FROM python:3.10
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-ENV PYTHONPATH=/app
-FROM python:3.10
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-ENV PYTHONPATH=/app
 ```
 
 强调：此 Dockerfile 不包含 COPY . . 指令，仅负责环境预装，代码通过挂载方式引入，以实现快速开发调试。
