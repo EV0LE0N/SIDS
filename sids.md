@@ -562,6 +562,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONPATH=/app
+FROM python:3.10
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONPATH=/app
+FROM python:3.10
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONPATH=/app
 ```
 
 强调：此 Dockerfile 不包含 COPY . . 指令，仅负责环境预装，代码通过挂载方式引入，以实现快速开发调试。
@@ -1003,10 +1015,10 @@ def main():
         df_raw = load_data(spark, input_path)
         df_clean = clean_data(df_raw, core_cols)
         df_unified = unify_label(df_clean)
-      
+    
         # 注意：由于使用了显式 Schema，不再需要手动 cast("double")
         # Schema 已确保所有核心特征字段为 DoubleType
-      
+    
         # 【性能优化】缓存中间结果，避免重复扫描
         # 因为后续既要计算统计又要保存Parquet，缓存可避免二次读取1GB数据
         print("正在缓存清洗后的数据以优化性能...")
@@ -1014,13 +1026,13 @@ def main():
         # 触发缓存动作（通过count触发实际缓存）
         total_count = df_unified.count()
         print(f"数据缓存完成，总记录数: {total_count}")
-      
+    
         # 预计算统计指标（使用缓存数据）
         precompute_stats(df_unified, stats_path)
-      
+    
         # 保存处理后的数据为Parquet格式（使用缓存数据）
         save_processed_data(df_unified, processed_path)
-      
+    
         # 清理缓存
         df_unified.unpersist()
         print("数据处理完成！")
@@ -1166,19 +1178,19 @@ def main():
         model = train_xgboost_model(X_train, y_train)
         evaluate_model(model, X_test, y_test)
         save_model(model, model_path)
-      
+    
         # --- 核心：导出特征重要性 (论文加分项) ---
         importance = model.feature_importances_
         # 确保 core_cols 与重要性得分一一对应
         feature_map = {name: float(score) for name, score in zip(core_cols, importance)}
         # 排序并取 Top 10
         top_features = dict(sorted(feature_map.items(), key=lambda item: item[1], reverse=True)[:10])
-      
+    
         # 保存为 JSON
         with open("/app/data/models/feature_importance.json", "w", encoding="utf-8") as f:
             json.dump(top_features, f, ensure_ascii=False, indent=2)
         print("特征重要性已保存，准备用于前端雷达图展示。")
-      
+    
         print("模型训练完成！")
     except Exception as e:
         print(f"模型训练失败：{str(e)}")

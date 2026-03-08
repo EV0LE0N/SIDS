@@ -1,0 +1,65 @@
+
+version: '3.8'
+
+services:
+  # Spark 服务 (ETL 核心，模型训练在Web容器中运行)
+  spark:
+    image: apache/spark:3.5.0-python3
+    platform: linux/arm64
+    container_name: spark
+    # 核心改动：显式增加 user: root 配置，并注明：“此配置旨在解决容器间数据读写的权限问题，确保 Spark 写入的 Parquet 结果能被 Web 后端无障碍读取。”
+    user: root
+    environment:
+      # [CRITICAL] 将项目根目录加入 Python 搜索路径，以共享 utils.py
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      - ./:/app
+    networks:
+      - sids_net
+    deploy:
+      resources:
+        limits:
+          memory: 12G  # 提升至 12G 以匹配容器水位，与 web-app (4G) 总和为 16G，在 24G 安全线内
+
+  # Web 应用服务 (FastAPI 后端 + 模型训练执行环境)
+  app:
+    build: .
+    platform: linux/arm64
+    container_name: web_app
+    # 运行容器时使用宿主机 UID:GID 避免宿主机文件被写成 root
+    user: "501:20"
+    working_dir: /app/web_app/backend
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./data:/app/data
+      - ./:/app
+    ports:
+      - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - sids_net
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # Nginx 网关 (系统入口)
+  nginx:
+    image: nginx:latest
+    platform: linux/arm64
+    container_name: gateway
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./web_app/frontend/dist:/usr/share/nginx/html
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - sids_net
+
+networks:
+  sids_net:
+    driver: bridge
