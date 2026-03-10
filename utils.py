@@ -5,12 +5,12 @@ import pandas as pd
 import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
-# 核心特征清单：定义模型唯一认可的输入维度
+# 核心特征清单：定义模型唯一认可的输入维度（严格对齐真实 CSV 表头缩写）
 CORE_FEATURES = [
-    "Flow Duration", "Total Fwd Packets", "Total Backward Packets",
-    "Total Length of Fwd Packets", "Total Length of Bwd Packets",
-    "Fwd Packet Length Max", "Fwd Packet Length Min",
-    "Fwd Packet Length Mean", "Flow Bytes/s", "Flow Packets/s"
+    "Flow Duration", "Tot Fwd Pkts", "Tot Bwd Pkts",
+    "TotLen Fwd Pkts", "TotLen Bwd Pkts",
+    "Fwd Pkt Len Max", "Fwd Pkt Len Min",
+    "Fwd Pkt Len Mean", "Flow Byts/s", "Flow Pkts/s"
 ]
 LABEL_COL = "Label"
 
