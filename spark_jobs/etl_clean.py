@@ -19,18 +19,25 @@ def create_spark_session():
         .getOrCreate()
 
 def load_data(spark, input_path):
-    """宽容读取模式：防崩溃、按需提取、强制转换"""
-    # 1. 宽容读取：全部作为 String 读取，防止特殊时间格式或脏数据导致解析崩溃
+    """宽容读取模式：防崩溃、去空格、处理异常字符串、按需提取、强制转换"""
+    # 1. 宽容读取：全部作为 String 读取
     df_raw = spark.read.csv(input_path, header=True, inferSchema=False)
-    
-    # 2. 按需提取：仅保留我们在工具类中定义的核心特征，加上标签和用于统计的目标端口
+  
+    # 2. 剥离隐形空格：彻底解决原数据集表头带空格导致列名不匹配的致命 Bug
+    df_raw = df_raw.toDF(*[c.strip() for c in df_raw.columns])
+  
+    # 3. 按需提取核心字段
     cols_to_select = CORE_FEATURES + ["Label", "Dst Port"]
     df_selected = df_raw.select(*cols_to_select)
-    
-    # 3. 强转类型：将特征列和端口列统一转换为 DoubleType，隔离原始字符串格式问题
+  
+    # 4. 前置抹除异常值：在转 double 之前，将各种异形无穷大/空值字符串统一转为 null
+    bad_strings = ["Infinity", "inf", "-inf", "NaN", "nan"]
+    df_selected = df_selected.na.replace(bad_strings, None)
+  
+    # 5. 强转类型：安全隔离原始字符串格式问题
     for col_name in CORE_FEATURES + ["Dst Port"]:
         df_selected = df_selected.withColumn(col_name, col(col_name).cast("double"))
-        
+      
     return df_selected
 
 def clean_data(df, core_cols):
@@ -78,7 +85,8 @@ def precompute_stats(df, output_path):
         .limit(10) \
         .collect()
     
-    top10_port_dict = {str(row["Dst Port"]).strip(): int(row["packet_count"]) for row in top10_port if row["Dst Port"] is not None}
+    # 将浮点数端口（如 80.0）转为整型后再转字符串，优化前端显示
+    top10_port_dict = {str(int(row["Dst Port"])): int(row["packet_count"]) for row in top10_port if row["Dst Port"] is not None}
     
     # 3. 构造 stats 字典，确保变量闭环
     stats = {
