@@ -1,8 +1,6 @@
 
 # 公共工具模块
 # 作用：统一数据清洗逻辑与特征配置，消除训练-推理偏差
-import pandas as pd
-import numpy as np
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
 # 核心特征清单：定义模型唯一认可的输入维度（严格对齐真实 CSV 表头缩写）
@@ -25,6 +23,8 @@ def clean_data_logic(df_pandas):
     统一清洗逻辑，供 ETL (Spark转Pandas逻辑) 和 API (单条预测) 复用
     注意：输入必须是 Pandas DataFrame 或 字典
     """
+    import pandas as pd
+    import numpy as np
     # 1. 处理无穷大与非法字符串，防止推理阶段崩溃
     df_pandas = df_pandas.replace(
         [np.inf, -np.inf, "Infinity", "NaN", "inf", "-inf"],

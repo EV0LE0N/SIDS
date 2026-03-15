@@ -19,31 +19,29 @@ def create_spark_session():
         .getOrCreate()
 
 def load_data(spark, input_path):
-    """宽容读取模式：防崩溃、去空格、处理异常字符串、按需提取、强制转换"""
-    # 1. 宽容读取：全部作为 String 读取
+    """最稳逻辑：读取 -> 剥离空格 -> 强转(自动处理非法字符串) -> 填充"""
+    # 1. 宽容读取
     df_raw = spark.read.csv(input_path, header=True, inferSchema=False)
   
-    # 2. 剥离隐形空格：彻底解决原数据集表头带空格导致列名不匹配的致命 Bug
+    # 2. 剥离表头空格（解决原数据集 Bug）
     df_raw = df_raw.toDF(*[c.strip() for c in df_raw.columns])
   
     # 3. 按需提取核心字段
     cols_to_select = CORE_FEATURES + ["Label", "Dst Port"]
     df_selected = df_raw.select(*cols_to_select)
   
-    # 4. 前置抹除异常值：在转 double 之前，将各种异形无穷大/空值字符串统一转为 null
-    bad_strings = ["Infinity", "inf", "-inf", "NaN", "nan"]
-    df_selected = df_selected.na.replace(bad_strings, None)
-  
-    # 5. 强转类型：安全隔离原始字符串格式问题
+    # 4. 【关键修复】放弃 na.replace，直接强转！
+    # Spark 的 cast("double") 会自动把 "Infinity", "NaN" 等转为 null
     for col_name in CORE_FEATURES + ["Dst Port"]:
         df_selected = df_selected.withColumn(col_name, col(col_name).cast("double"))
       
+    # 5. 统一处理转换后产生的 null 值（原 Infinity/NaN 此时已是 null）
+    df_selected = df_selected.fillna(0, subset=CORE_FEATURES)
+    
     return df_selected
 
 def clean_data(df, core_cols):
     """数据清洗：异常值处理+零值填充"""
-    # 替换Infinity为null（使用 na.replace 方法）
-    df = df.na.replace("Infinity", None)
     # 过滤核心字段负数 (修正为 >= 0，保留 0 值)
     for col_name in core_cols:
         df = df.filter(col(col_name) >= 0)
@@ -52,20 +50,27 @@ def clean_data(df, core_cols):
     return df
 
 def unify_label(df):
-    """标签统一：映射为3大类"""
+    """标签统一：映射为3大类 (修复混合类型替换 Bug)"""
+    # 1. 字典的值必须改为字符串，保证 String -> String 的同构替换
     label_mapping = {
-        "Benign": 0,
-        "DoS attacks-Hulk": 1,
-        "DoS attacks-GoldenEye": 1,
-        "DoS attacks-Slowloris": 1,
-        "DoS attacks-SlowHTTPTest": 1,
-        "FTP-BruteForce": 2,
-        "SSH-Bruteforce": 2
+        "Benign": "0",
+        "DoS attacks-Hulk": "1",
+        "DoS attacks-GoldenEye": "1",
+        "DoS attacks-Slowloris": "1",
+        "DoS attacks-SlowHTTPTest": "1",
+        "FTP-BruteForce": "2",
+        "SSH-Bruteforce": "2"
     }
-    # 替换标签
+    
+    # 2. 执行同构替换（绝对不会报错）
     df = df.replace(label_mapping, subset=["Label"])
-    # 删除未匹配标签数据
-    df = df.filter(col("Label").isin([0, 1, 2]))
+    
+    # 3. 过滤掉没有匹配上（非 "0", "1", "2"）的无效脏数据
+    df = df.filter(col("Label").isin(["0", "1", "2"]))
+    
+    # 4. 最后统一将 Label 强转为整型，为后续 XGBoost 训练做好准备
+    df = df.withColumn("Label", col("Label").cast("integer"))
+    
     return df
 
 def precompute_stats(df, output_path):
@@ -106,9 +111,9 @@ def precompute_stats(df, output_path):
 
 def save_processed_data(df, output_path):
     """保存清洗后的数据为Parquet格式 (强制合并)"""
-  # 注意：不要使用 coalesce(1) 将所有分区拉到单个分区（可能导致 OOM）
-  # 让 Spark 写出多个 Parquet 分片，DuckDB 可使用通配符读取：read_parquet('path/*.parquet')
-  df.write.mode("overwrite").parquet(output_path)
+    # 注意：不要使用 coalesce(1) 将所有分区拉到单个分区（可能导致 OOM）
+    # 让 Spark 写出多个 Parquet 分片，DuckDB 可使用通配符读取：read_parquet('path/*.parquet')
+    df.write.mode("overwrite").parquet(output_path)
 
 def main():
     # 配置路径
