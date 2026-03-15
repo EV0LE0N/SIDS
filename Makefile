@@ -27,17 +27,17 @@ build-ui:
 	@echo "✅ 前端构建完成，dist/ 目录已生成。"
 
 etl:
-  @./run_etl.sh
-  @$(MAKE) fix-perms
+	@./run_etl.sh
+	@$(MAKE) fix-perms
 
 train:
-  @./run_train.sh
-  @$(MAKE) fix-perms
+	@./run_train.sh
+	@$(MAKE) fix-perms
 
 # 修复宿主机目录权限问题（容器可能以非宿主用户写入文件）
 fix-perms:
-  @echo "🔧 修复 data 目录权限为当前宿主用户..."
-  @chown -R $(shell id -u):$(shell id -g) data || true
+	@echo "🔧 修复 data 目录权限为当前宿主用户..."
+	@chown -R $(shell id -u):$(shell id -g) data || true
 
 
 all: build-ui up

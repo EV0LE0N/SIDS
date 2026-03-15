@@ -1,0 +1,8 @@
+
+fastapi
+uvicorn[standard]
+xgboost
+pandas
+duckdb
+scikit-learn
+python-multipart
