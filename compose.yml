@@ -1,6 +1,4 @@
 
-version: '3.8'
-
 services:
   # Spark 服务 (ETL 核心，模型训练在Web容器中运行)
   spark:
