@@ -72,10 +72,25 @@ def evaluate_model(model, X_test, y_test):
     recall = recall_score(y_test_int, y_pred_int, average='weighted', zero_division=0)
     f1 = f1_score(y_test_int, y_pred_int, average='weighted', zero_division=0)
   
-    # 分类报告
-    report = classification_report(y_test_int, y_pred_int, target_names=["Normal", "DoS/DDoS", "BruteForce"], zero_division=0)
+    # 【核心修复】：动态获取实际存在的类别
+    # 取 y_test_int 和 y_pred_int 中出现过的所有唯一类别
+    unique_classes = sorted(list(set(y_test_int) | set(y_pred_int)))
+    
+    # 定义全局标签字典
+    label_map = {0: "Normal", 1: "DoS/DDoS", 2: "BruteForce"}
+    
+    # 动态生成本次评估的 target_names
+    dynamic_target_names = [label_map.get(c, f"Unknown-{c}") for c in unique_classes]
   
-    # 混淆矩阵
+    # 分类报告 (使用动态 target_names)
+    report = classification_report(
+        y_test_int, 
+        y_pred_int, 
+        target_names=dynamic_target_names, 
+        zero_division=0
+    )
+  
+    # 混淆矩阵 (大小会动态适配为 unique_classes 的长度)
     cm = confusion_matrix(y_test_int, y_pred_int)
   
     print("=" * 50)
@@ -104,10 +119,10 @@ def evaluate_model(model, X_test, y_test):
         f.write("\n混淆矩阵：\n")
         f.write(str(cm))
   
-    # 同时保存混淆矩阵为JSON格式，便于前端可视化
+    # 【同步修复】：保存混淆矩阵为JSON格式，必须使用动态标签！
     cm_dict = {
         "matrix": cm.tolist(),
-        "labels": ["Normal", "DoS/DDoS", "BruteForce"]
+        "labels": dynamic_target_names  # 使用动态标签，与实际类别对齐
     }
     with open("/app/data/models/confusion_matrix.json", "w", encoding="utf-8") as f:
         json.dump(cm_dict, f, indent=2)
