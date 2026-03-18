@@ -1,7 +1,7 @@
 
-# 公共工具模块
-# 作用：统一数据清洗逻辑与特征配置，消除训练-推理偏差
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+# utils.py
+# 公共工具模块 - 跨容器共享配置
+# 重要：所有容器依赖的第三方库必须使用懒加载模式，避免跨容器依赖泄露
 
 # 核心特征清单：定义模型唯一认可的输入维度（严格对齐真实 CSV 表头缩写）
 CORE_FEATURES = [
@@ -12,11 +12,17 @@ CORE_FEATURES = [
 ]
 LABEL_COL = "Label"
 
-# 显式 Schema：解决 inferSchema 性能瓶颈与类型推断错误
-IDS2018_SCHEMA = StructType([
-    *[StructField(f, DoubleType(), True) for f in CORE_FEATURES],
-    StructField(LABEL_COL, StringType(), True)
-])
+def get_spark_schema():
+    """
+    懒加载模式：仅当 Spark 容器调用此函数时，才会真正导入 pyspark 依赖
+    解决 Web 容器 (无 pyspark 环境) 导入 utils.py 时的 ModuleNotFoundError 报错
+    """
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+    
+    return StructType([
+        *[StructField(f, DoubleType(), True) for f in CORE_FEATURES],
+        StructField(LABEL_COL, StringType(), True)
+    ])
 
 def clean_data_logic(df_pandas):
     """

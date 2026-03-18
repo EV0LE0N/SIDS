@@ -6,7 +6,7 @@ import json
 import os
 from datetime import datetime
 # 修改点：引用公共配置
-from utils import CORE_FEATURES, IDS2018_SCHEMA
+from utils import CORE_FEATURES  # 仅引用常量，Schema 通过 cast("double") 动态处理
 
 def create_spark_session():
     """创建SparkSession实例 (已优化 I/O 配置)"""
