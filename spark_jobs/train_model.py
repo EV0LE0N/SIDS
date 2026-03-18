@@ -1,5 +1,6 @@
 import xgboost as xgb
 import pandas as pd
+import numpy as np
 from duckdb import connect
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_score, recall_score, f1_score
@@ -48,7 +49,6 @@ def train_xgboost_model(X_train, y_train):
         learning_rate=0.1,
         n_estimators=100,
         random_state=42,
-        use_label_encoder=False,
         eval_metric="mlogloss"
     )
     model.fit(X_train, y_train)
@@ -58,17 +58,25 @@ def evaluate_model(model, X_test, y_test):
     """评估模型性能（强化版：包含多维度指标与混淆矩阵）"""
     y_pred = model.predict(X_test)
   
-    # 基础指标
-    accuracy = accuracy_score(y_test, y_pred)
-    precision = precision_score(y_test, y_pred, average='weighted')
-    recall = recall_score(y_test, y_pred, average='weighted')
-    f1 = f1_score(y_test, y_pred, average='weighted')
+    # 【核心修复】：如果预测结果是二维概率矩阵，使用 argmax 转换为一维类别标签
+    if y_pred.ndim > 1:
+        y_pred = np.argmax(y_pred, axis=1)
+        
+    # 强制将 pandas Series 和 numpy Array 统一转为整型，防止底层类型冲突
+    y_test_int = y_test.astype(int)
+    y_pred_int = y_pred.astype(int)
+  
+    # 基础指标 (注意：后续全都要使用转换后的 y_test_int 和 y_pred_int)
+    accuracy = accuracy_score(y_test_int, y_pred_int)
+    precision = precision_score(y_test_int, y_pred_int, average='weighted', zero_division=0)
+    recall = recall_score(y_test_int, y_pred_int, average='weighted', zero_division=0)
+    f1 = f1_score(y_test_int, y_pred_int, average='weighted', zero_division=0)
   
     # 分类报告
-    report = classification_report(y_test, y_pred, target_names=["Normal", "DoS/DDoS", "BruteForce"])
+    report = classification_report(y_test_int, y_pred_int, target_names=["Normal", "DoS/DDoS", "BruteForce"], zero_division=0)
   
     # 混淆矩阵
-    cm = confusion_matrix(y_test, y_pred)
+    cm = confusion_matrix(y_test_int, y_pred_int)
   
     print("=" * 50)
     print("模型评估结果（多维度指标）")
