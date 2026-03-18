@@ -20,6 +20,9 @@ __pycache__/
 ._*
 .Spotlight-V100
 .Trashes
+.opencode
 ehthumbs.db
 Thumbs.db
+opencode.jsonc
 init_project.sh
+sids_*.md
