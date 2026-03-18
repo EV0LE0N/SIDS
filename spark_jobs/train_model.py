@@ -5,8 +5,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_score, recall_score, f1_score
 import os
 import json
-# 修改点 1：导入配置
-from utils import CORE_FEATURES
+# 修改点 1：导入配置与清洗逻辑
+from utils import CORE_FEATURES, clean_data_logic
 
 # 修改点 2：优化 DuckDB 读取与内存
 def load_processed_data(parquet_path):
@@ -18,6 +18,11 @@ def load_processed_data(parquet_path):
     # 注意：parquet_path 指向目录，DuckDB 会自动查找其中的 parquet 文件
     df = con.execute(f"SELECT {cols_sql} FROM read_parquet('{parquet_path}/*.parquet')").df()
     con.close()
+    
+    # 【核心修复】：加上最终安全防线！调用 utils 中的清洗逻辑处理 inf 和 NaN
+    # 彻底消除 Spark 遗留的 IEEE 754 脏数据，并保证与 API 推理环境 100% 对齐
+    df = clean_data_logic(df)
+    
     # 特征安检闸机：强制对齐列顺序，屏蔽冗余字段（通过SQL SELECT实现）
     return df
 
