@@ -24,14 +24,14 @@
               :on-error="handleUploadError"
               :before-upload="beforeUpload"
               :show-file-list="false"
-              accept=".csv,.parquet"
+              accept=".csv"
             >
               <el-icon class="el-icon--upload"><upload-filled /></el-icon>
               <div class="el-upload__text">
                 拖拽文件到此处或 <em>点击上传</em>
               </div>
               <div class="el-upload__tip">
-                支持 CSV 或 Parquet 格式，文件大小不超过 100MB
+                支持 CSV 格式，文件大小不超过 500MB
               </div>
             </el-upload>
             
@@ -63,7 +63,7 @@
         </el-card>
         
         <!-- 检测结果 -->
-        <el-card shadow="hover" class="result-card" v-if="detectionResult">
+        <el-card shadow="hover" class="result-card" v-if="detectionStats">
           <template #header>
             <div class="card-header">
               <el-icon><Document /></el-icon>
@@ -73,19 +73,15 @@
           
           <div class="result-content">
             <div class="result-summary">
-              <div class="result-item" :class="getResultClass(detectionResult.overall_result)">
+              <div class="result-item" :class="getResultClass(detectionStats)">
                 <div class="result-label">总体检测结果</div>
-                <div class="result-value">{{ getResultText(detectionResult.overall_result) }}</div>
+                <div class="result-value">{{ getResultText(detectionStats) }}</div>
               </div>
               
               <div class="result-stats">
                 <div class="stat-item">
-                  <div class="stat-label">检测时间</div>
-                  <div class="stat-value">{{ detectionResult.detection_time }}ms</div>
-                </div>
-                <div class="stat-item">
                   <div class="stat-label">处理记录数</div>
-                  <div class="stat-value">{{ detectionResult.total_records }}</div>
+                  <div class="stat-value">{{ detectionStats.total }}</div>
                 </div>
               </div>
             </div>
@@ -95,20 +91,20 @@
             <div class="result-details">
               <div class="detail-header">详细检测结果</div>
               <el-table
-                :data="detectionResult.detailed_results"
+                :data="detectionDetails"
                 stripe
                 style="width: 100%"
                 max-height="300"
               >
-                <el-table-column prop="record_id" label="记录ID" width="100" />
-                <el-table-column prop="prediction" label="预测结果" width="120">
+                <el-table-column prop="row_id" label="记录ID" width="100" />
+                <el-table-column prop="type" label="预测结果" width="120">
                   <template #default="scope">
-                    <el-tag :type="getPredictionTagType(scope.row.prediction)">
-                      {{ getPredictionText(scope.row.prediction) }}
+                    <el-tag :type="getPredictionTagType(scope.row.type)">
+                      {{ scope.row.type }}
                     </el-tag>
                   </template>
                 </el-table-column>
-                <el-table-column prop="confidence" label="置信度" width="120">
+                <el-table-column prop="confidence" label="置信度" width="140">
                   <template #default="scope">
                     <el-progress 
                       :percentage="Math.round(scope.row.confidence * 100)" 
@@ -118,7 +114,6 @@
                     <span style="margin-left: 10px">{{ (scope.row.confidence * 100).toFixed(1) }}%</span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="attack_type" label="攻击类型" />
               </el-table>
             </div>
           </div>
@@ -210,8 +205,9 @@ const uploadHeaders = ref({
 })
 const uploadData = ref({})
 
-// 检测结果
-const detectionResult = ref(null)
+// 检测结果（严格使用 stats + details 二元结构）
+const detectionStats = ref(null)
+const detectionDetails = ref([])
 
 // 模型信息
 const modelInfo = ref({
@@ -226,15 +222,15 @@ const detectStatsChartRef = ref(null)
 
 // 上传前处理
 const beforeUpload = (file) => {
-  const isAllowedType = file.type === 'text/csv' || file.name.endsWith('.parquet')
-  const isLt100M = file.size / 1024 / 1024 < 100
+  const isCSV = file.name.toLowerCase().endsWith('.csv')
+  const isLt500M = file.size / 1024 / 1024 < 500
   
-  if (!isAllowedType) {
-    ElMessage.error('只能上传 CSV 或 Parquet 格式的文件!')
+  if (!isCSV) {
+    ElMessage.error('只能上传 CSV 格式的文件!')
     return false
   }
-  if (!isLt100M) {
-    ElMessage.error('文件大小不能超过 100MB!')
+  if (!isLt500M) {
+    ElMessage.error('文件大小不能超过 500MB!')
     return false
   }
   
@@ -268,11 +264,14 @@ const handleDetect = async () => {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
     
-    const result = await uploadPredict(formData)
-    detectionResult.value = result
+    const response = await uploadPredict(formData)
+    // API 返回结构：{ status: 'success', result: { stats: {...}, details: [...] } }
+    const resultData = response.result
+    detectionStats.value = resultData.stats
+    detectionDetails.value = resultData.details
     
     // 更新统计图表
-    updateStatsChart(result)
+    updateStatsChart(resultData.stats)
     
     ElMessage.success('检测完成！')
   } catch (error) {
@@ -291,44 +290,32 @@ const resetDetection = () => {
     type: 'warning'
   }).then(() => {
     selectedFile.value = null
-    detectionResult.value = null
+    detectionStats.value = null
+    detectionDetails.value = []
     ElMessage.success('已重置')
   }).catch(() => {})
 }
 
 // 获取结果样式类
-const getResultClass = (result) => {
-  return result === 'normal' ? 'result-normal' : 'result-attack'
+const getResultClass = (stats) => {
+  if (!stats) return 'result-normal'
+  const hasAttack = (stats.dos || 0) + (stats.bruteforce || 0) > 0
+  return hasAttack ? 'result-attack' : 'result-normal'
 }
 
 // 获取结果文本
-const getResultText = (result) => {
-  const map = {
-    'normal': '正常流量',
-    'attack': '检测到攻击',
-    'suspicious': '可疑流量'
-  }
-  return map[result] || '未知状态'
+const getResultText = (stats) => {
+  if (!stats) return '未知状态'
+  const hasAttack = (stats.dos || 0) + (stats.bruteforce || 0) > 0
+  return hasAttack ? '检测到攻击' : '正常流量'
 }
 
 // 获取预测标签类型
-const getPredictionTagType = (prediction) => {
-  const map = {
-    '0': 'success',  // 正常
-    '1': 'danger',   // DoS/DDoS
-    '2': 'warning'   // 暴力破解
-  }
-  return map[prediction] || 'info'
-}
-
-// 获取预测文本
-const getPredictionText = (prediction) => {
-  const map = {
-    '0': '正常',
-    '1': 'DoS/DDoS',
-    '2': '暴力破解'
-  }
-  return map[prediction] || '未知'
+const getPredictionTagType = (type) => {
+  if (type === '正常流量') return 'success'
+  if (type === 'DoS攻击') return 'danger'
+  if (type === '暴力破解') return 'warning'
+  return 'info'
 }
 
 // 获取置信度状态
@@ -339,9 +326,9 @@ const getConfidenceStatus = (confidence) => {
 }
 
 // 更新统计图表
-const updateStatsChart = (result) => {
-  if (!detectStatsChart.value || !result) return
-  
+const updateStatsChart = (stats) => {
+  if (!detectStatsChart.value || !stats) return
+   
   const option = {
     tooltip: {
       trigger: 'item',
@@ -379,9 +366,9 @@ const updateStatsChart = (result) => {
           show: false
         },
         data: [
-          { value: result.normal_count || 0, name: '正常流量' },
-          { value: result.dos_count || 0, name: 'DoS/DDoS攻击' },
-          { value: result.bruteforce_count || 0, name: '暴力破解攻击' }
+          { value: stats.normal || 0, name: '正常流量' },
+          { value: stats.dos || 0, name: 'DoS/DDoS攻击' },
+          { value: stats.bruteforce || 0, name: '暴力破解攻击' }
         ]
       }
     ]

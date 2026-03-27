@@ -149,8 +149,8 @@ const loadStatsData = async () => {
       formatter: '{b} 端口<br/>{a}: {c}'
     };
     
-    // 更新统计数据
-    totalPackets.value = res.total_packets || 0;
+    // 更新统计数据（严格使用 stats_metadata.total_records）
+    totalPackets.value = res.stats_metadata?.total_records || 0;
     normalPackets.value = attackDist['0'] || 0;
     attackPackets.value = (attackDist['1'] || 0) + (attackDist['2'] || 0);
     attackRate.value = totalPackets.value > 0 ? 
