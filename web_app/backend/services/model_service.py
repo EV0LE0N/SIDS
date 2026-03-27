@@ -3,8 +3,7 @@ import xgboost as xgb
 import os
 import pandas as pd
 import io
-import sys
-sys.path.append('/Users/vea/sids')  # 添加项目根目录到Python路径
+# 注意：模块导入通过 PYTHONPATH=/app 环境变量保证，无需 sys.path.append
 from utils import clean_data_logic, CORE_FEATURES
 
 # 全局变量缓存模型
