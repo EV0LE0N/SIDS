@@ -25,9 +25,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: false,
-    rollupOptions: {
-      input: resolve(__dirname, 'public/index.html')
-    }
+    sourcemap: false
+    // 严禁添加 rollupOptions.input 配置！
+    // Vite 会自动读取根目录下的 index.html 作为入口
   }
 })

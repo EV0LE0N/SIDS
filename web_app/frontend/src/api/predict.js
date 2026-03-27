@@ -41,17 +41,15 @@ uploadClient.interceptors.response.use(
       } else if (status === 400) {
         message = '文件格式错误，请上传CSV格式文件';
       } else if (status === 413) {
-        message = '文件大小超过限制（最大50MB）';
+        message = '文件大小超过限制（最大500MB）';
       } else if (status === 500) {
         message = '服务器处理文件时出错';
       }
       
       return Promise.reject(new Error(message));
     } else if (error.request) {
-      // 请求已发送但没有收到响应
       return Promise.reject(new Error('网络连接失败，请检查后端服务是否正常运行'));
     } else {
-      // 请求配置出错
       return Promise.reject(new Error('请求配置错误: ' + error.message));
     }
   }
@@ -69,13 +67,12 @@ export const uploadPredict = async (formData) => {
   } catch (error) {
     console.error('上传预测失败:', error)
     
-    // 提供更友好的错误信息
     if (error.message.includes('模型未加载')) {
       throw new Error('检测模型未加载，请先执行模型训练任务')
     } else if (error.message.includes('文件格式')) {
-      throw new Error('文件格式错误，请上传CSV或Parquet格式的文件')
+      throw new Error('文件格式错误，请上传CSV格式的文件')
     } else if (error.message.includes('413')) {
-      throw new Error('文件大小超过限制，请上传小于100MB的文件')
+      throw new Error('文件大小超过限制，请上传小于500MB的文件')
     } else {
       throw error
     }
@@ -97,12 +94,11 @@ export const validateFile = (file) => {
     };
   }
   
-  // 检查文件大小（最大50MB）
-  const maxSize = 50 * 1024 * 1024; // 50MB
+  const maxSize = 500 * 1024 * 1024;
   if (file.size > maxSize) {
     return {
       valid: false,
-      message: `文件大小超过限制：${(file.size / 1024 / 1024).toFixed(2)}MB > 50MB`
+      message: `文件大小超过限制：${(file.size / 1024 / 1024).toFixed(2)}MB > 500MB`
     };
   }
   
@@ -149,39 +145,8 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-/**
- * 批量预测（JSON格式）
- * @param {Array} records 记录数组
- * @returns {Promise} 预测结果
- */
-export const batchPredict = async (records) => {
-  try {
-    const response = await uploadClient.post('/predict/batch', { records })
-    return response
-  } catch (error) {
-    console.error('批量预测失败:', error)
-    throw error
-  }
-}
-
-/**
- * 获取模型信息
- * @returns {Promise} 模型信息
- */
-export const getModelInfo = async () => {
-  try {
-    const response = await uploadClient.get('/predict/model-info')
-    return response
-  } catch (error) {
-    console.error('获取模型信息失败:', error)
-    throw error
-  }
-}
-
 export default {
   uploadPredict,
-  batchPredict,
-  getModelInfo,
   validateFile,
   getFileInfo
 }

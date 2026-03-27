@@ -36,28 +36,16 @@ const router = createRouter({
   routes,
 });
 
-// 路由守卫 - 页面标题设置
+// 路由守卫 - 合并标题设置与权限控制（严禁使用多个 beforeEach）
 router.beforeEach((to, from, next) => {
-  // 设置页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - SIDS网络攻击检测系统`;
   } else {
     document.title = 'SIDS网络攻击检测系统';
   }
-  
   next();
 });
 
-// 路由守卫 - 页面访问权限控制（如果需要）
-router.beforeEach((to, from, next) => {
-  // 这里可以添加权限验证逻辑
-  // 例如：检查用户是否登录，是否有权限访问该页面等
-  
-  // 暂时不需要权限控制，直接放行
-  next();
-});
-
-// 路由错误处理
 router.onError((error) => {
   console.error('路由错误:', error);
 });
