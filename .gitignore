@@ -25,4 +25,6 @@ ehthumbs.db
 Thumbs.db
 opencode.jsonc
 init_project.sh
-sids_*.md
+sids_V*.md
+
+web_app/frontend/dist/
