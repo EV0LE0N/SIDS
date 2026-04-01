@@ -1,3 +1,4 @@
+.gitignore
 # --- 核心：严禁大数据入库 ---
 data/raw/*
 data/processed/*
