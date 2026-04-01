@@ -1,15 +1,11 @@
-.gitignore
-# --- 核心：严禁大数据入库 ---
 data/raw/*
 data/processed/*
 data/models/*
 
-# --- 保留目录结构 ---
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/models/.gitkeep
 
-# --- 全局屏蔽 ---
 *.csv
 *.parquet
 *.duckdb
