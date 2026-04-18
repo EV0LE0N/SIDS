@@ -8,7 +8,9 @@ CORE_FEATURES = [
     "Flow Duration", "Tot Fwd Pkts", "Tot Bwd Pkts",
     "TotLen Fwd Pkts", "TotLen Bwd Pkts",
     "Fwd Pkt Len Max", "Fwd Pkt Len Min",
-    "Fwd Pkt Len Mean", "Flow Byts/s", "Flow Pkts/s"
+    "Fwd Pkt Len Mean", "Flow Byts/s", "Flow Pkts/s",
+    "Bwd Pkt Len Max", "Bwd Pkt Len Min", "Bwd Pkt Len Mean",
+    "Flow IAT Mean", "Flow IAT Max"
 ]
 LABEL_COL = "Label"
 
