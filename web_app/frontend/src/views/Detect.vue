@@ -188,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import { 
@@ -420,7 +420,7 @@ const handleResize = () => {
 }
 
 // 组件卸载时清理
-onUnmounted(() => {
+onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   if (detectStatsChart.value) {
     detectStatsChart.value.dispose()

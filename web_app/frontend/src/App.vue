@@ -21,6 +21,10 @@
             <el-icon><Search /></el-icon>
             <span>攻击检测</span>
           </el-menu-item>
+          <el-menu-item index="/eda">
+            <el-icon><DataBoard /></el-icon>
+            <span>学术探索</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -50,7 +54,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataAnalysis, Search } from '@element-plus/icons-vue'
+import { DataAnalysis, Search, DataBoard } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
@@ -61,7 +65,8 @@ const activeMenu = computed(() => route.path)
 const currentPageTitle = computed(() => {
   const routeMap = {
     '/dashboard': '态势大屏',
-    '/detect': '攻击检测'
+    '/detect': '攻击检测',
+    '/eda': '学术探索'
   }
   return routeMap[route.path] || 'SIDS'
 })

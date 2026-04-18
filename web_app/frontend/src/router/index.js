@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Dashboard from '@/views/Dashboard.vue';
 import Detect from '@/views/Detect.vue';
+import EdaAnalysis from '@/views/EdaAnalysis.vue';
 
 const routes = [
   {
@@ -23,6 +24,15 @@ const routes = [
     meta: {
       title: '攻击检测分析',
       icon: 'UploadFilled',
+    },
+  },
+  {
+    path: '/eda',
+    name: 'EdaAnalysis',
+    component: EdaAnalysis,
+    meta: {
+      title: '学术探索大屏',
+      icon: 'DataBoard',
     },
   },
   {

@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { getStats } from '@/api/stats';
 import * as echarts from 'echarts';
 import { ElMessage } from 'element-plus';
@@ -222,7 +222,7 @@ onMounted(() => {
 });
 
 // 组件卸载时清理
-onUnmounted(() => {
+onBeforeUnmount(() => {
   window.removeEventListener('resize', () => {});
   if (attackDistChart.value) {
     attackDistChart.value.dispose();

@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',  // 支持非根路径部署
   root: '.',
   publicDir: 'public',
   plugins: [vue()],
