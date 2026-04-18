@@ -101,20 +101,24 @@ export default {
         },
         visualMap: {
           min: 0,
-          max: Math.max(...matrixData.flat()),
+          max: 1, // 改为按比例(0-1)映射颜色
           calculable: true,
           orient: 'horizontal',
           left: 'center',
-          bottom: '15%'
+          bottom: '15%',
+          dimension: 3 // 指定使用数组的第4个元素（比例）作为颜色映射基准
         },
         series: [{
           name: '混淆矩阵',
           type: 'heatmap',
-          data: matrixData.map((row, i) => 
-            row.map((value, j) => [j, i, value])
-          ).flat(),
+          // 增加比例计算：[列索引, 行索引, 真实数值, 行内占比]
+          data: matrixData.map((row, i) => {
+            const rowSum = row.reduce((a, b) => a + b, 0);
+            return row.map((value, j) => [j, i, value, rowSum === 0 ? 0 : value / rowSum]);
+          }).flat(),
           label: {
             show: true,
+            formatter: (params) => params.value[2], // 强制显示真实数值而非比例
             color: '#000'
           },
           emphasis: {
@@ -246,9 +250,7 @@ export default {
           ).flat(),
           label: {
             show: true,
-            formatter: (params) => {
-              return Math.abs(params.value[2]) > 0.5 ? params.value[2].toFixed(2) : '';
-            },
+            formatter: (params) => params.value[2].toFixed(2), // 移除 > 0.5 的阈值过滤，展示所有系数
             color: '#000',
             fontSize: 9
           }
@@ -289,13 +291,14 @@ export default {
           trigger: 'item',
           formatter: (param) => {
             const data = param.data;
+            // 修正索引：ECharts 的 data 结构为 [类别索引, min, Q1, median, Q3, max]
             return [
               `${param.seriesName}`,
-              `最大值: ${data[4]?.toFixed(2)}`,
-              `上四分位: ${data[3]?.toFixed(2)}`,
-              `中位数: ${data[2]?.toFixed(2)}`,
-              `下四分位: ${data[1]?.toFixed(2)}`,
-              `最小值: ${data[0]?.toFixed(2)}`
+              `最大值: ${data[5]?.toFixed(2)}`,
+              `上四分位: ${data[4]?.toFixed(2)}`,
+              `中位数: ${data[3]?.toFixed(2)}`,
+              `下四分位: ${data[2]?.toFixed(2)}`,
+              `最小值: ${data[1]?.toFixed(2)}`
             ].join('<br/>');
           }
         },
@@ -323,13 +326,14 @@ export default {
           tooltip: {
             formatter: (param) => {
               const data = param.data;
+              // 修正索引：ECharts 的 data 结构为 [类别索引, min, Q1, median, Q3, max]
               return [
                 `${param.seriesName}`,
-                `最大值: ${data[4]?.toFixed(2)}`,
-                `上四分位: ${data[3]?.toFixed(2)}`,
-                `中位数: ${data[2]?.toFixed(2)}`,
-                `下四分位: ${data[1]?.toFixed(2)}`,
-                `最小值: ${data[0]?.toFixed(2)}`
+                `最大值: ${data[5]?.toFixed(2)}`,
+                `上四分位: ${data[4]?.toFixed(2)}`,
+                `中位数: ${data[3]?.toFixed(2)}`,
+                `下四分位: ${data[2]?.toFixed(2)}`,
+                `最小值: ${data[1]?.toFixed(2)}`
               ].join('<br/>');
             }
           }

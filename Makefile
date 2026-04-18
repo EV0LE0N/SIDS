@@ -1,5 +1,9 @@
-
 # Makefile for SIDS (Spark-based Intrusion Detection System)
+
+# Node.js 路径配置（Raycast Node.js）
+NODE_BIN := /Users/vea/Library/Application\ Support/com.raycast.macos/NodeJS/runtime/22.14.0/bin
+NODE := $(NODE_BIN)/node
+NPM := $(NODE_BIN)/npm
 
 # 默认目标，展示可用命令
 help:
@@ -23,7 +27,7 @@ down:
 
 build-ui:
 	@echo "🔨 构建前端静态资源..."
-	@cd web_app/frontend && npm install && npm run build
+	@cd web_app/frontend && "$(NODE)" node_modules/vite/bin/vite.js build
 	@echo "✅ 前端构建完成，dist/ 目录已生成。"
 
 etl:

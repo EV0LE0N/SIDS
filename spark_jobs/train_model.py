@@ -95,10 +95,23 @@ def main():
                 subset = subset.sample(n=500, random_state=42)
             sampled_df = pd.concat([sampled_df, subset])
         
+        # --- 修正：执行真实的 PCA 降维 ---
+        from sklearn.decomposition import PCA
+        from sklearn.preprocessing import StandardScaler
+        
+        scaler = StandardScaler()
+        scaled_features = scaler.fit_transform(sampled_df[core_cols])
+        pca = PCA(n_components=2)
+        pca_features = pca.fit_transform(scaled_features)
+        
+        scatter_data = []
+        for i, label in enumerate(sampled_df['Label']):
+            scatter_data.append([round(float(pca_features[i, 0]), 3), round(float(pca_features[i, 1]), 3), int(label)])
+        
         corr_matrix = sampled_df[core_cols].corr().fillna(0).round(3)
         
         eda_data = {
-            "scatter_data": sampled_df[["Flow Pkts/s", "Flow Byts/s", "Label"]].values.tolist(),
+            "scatter_data": scatter_data,  # 已替换为降维后的第一、第二主成分
             "boxplot_data": {
                 "normal": sampled_df[sampled_df['Label'] == 0]["Fwd Pkt Len Max"].tolist(),
                 "dos": sampled_df[sampled_df['Label'] == 1]["Fwd Pkt Len Max"].tolist(),
