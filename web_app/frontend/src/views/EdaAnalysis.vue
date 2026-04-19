@@ -42,6 +42,28 @@
 import * as echarts from 'echarts';
 import { onMounted, onBeforeUnmount, ref } from 'vue';
 
+// 英文特征名 → 中文名称映射字典
+const FEATURE_CN_MAP = {
+  'Flow Duration':    '流持续时间',
+  'Tot Fwd Pkts':     '前向包总数',
+  'Tot Bwd Pkts':     '后向包总数',
+  'TotLen Fwd Pkts':  '前向包总长度',
+  'TotLen Bwd Pkts':  '后向包总长度',
+  'Fwd Pkt Len Max':  '前向包最大长度',
+  'Fwd Pkt Len Min':  '前向包最小长度',
+  'Fwd Pkt Len Mean': '前向包平均长度',
+  'Flow Byts/s':      '流字节速率',
+  'Flow Pkts/s':      '流包速率',
+  'Bwd Pkt Len Max':  '后向包最大长度',
+  'Bwd Pkt Len Min':  '后向包最小长度',
+  'Bwd Pkt Len Mean': '后向包平均长度',
+  'Flow IAT Mean':    '流间隔均值',
+  'Flow IAT Max':     '流间隔最大值',
+};
+
+// 将英文特征名数组转换为中文
+const toCN = (name) => FEATURE_CN_MAP[name] || name;
+
 export default {
   name: 'EdaAnalysis',
   setup() {
@@ -101,12 +123,9 @@ export default {
         },
         visualMap: {
           min: 0,
-          max: 1, // 改为按比例(0-1)映射颜色
-          calculable: true,
-          orient: 'horizontal',
-          left: 'center',
-          bottom: '15%',
-          dimension: 3 // 指定使用数组的第4个元素（比例）作为颜色映射基准
+          max: 1,
+          show: false,       // 完全隐藏横条控件
+          dimension: 3       // 指定使用数组的第4个元素（比例）作为颜色映射基准
         },
         series: [{
           name: '混淆矩阵',
@@ -140,16 +159,15 @@ export default {
       const scatterData = edaSampleData.scatter_data;
       
       // 解析 scatter_data: [[x, y, label], ...]
-      const sampleSize = Math.min(500, scatterData.length);
-      const sampledData = scatterData.slice(0, sampleSize);
-
+      // 注意：数据按类别顺序存储（0×N → 1×N → 2×N），必须遍历全部数据而非截取
       const labelNames = ['正常流量', 'DoS/DDoS攻击', '暴力破解攻击'];
       const seriesData = [[], [], []];
       
-      for (let i = 0; i < sampledData.length; i++) {
-        const [x, y, label] = sampledData[i];
-        if (label >= 0 && label < 3) {
-          seriesData[label].push([x, y]);
+      for (let i = 0; i < scatterData.length; i++) {
+        const [x, y, label] = scatterData[i];
+        const labelIdx = Math.round(label); // 兼容浮点label
+        if (labelIdx >= 0 && labelIdx < 3) {
+          seriesData[labelIdx].push([x, y]);
         }
       }
 
@@ -201,22 +219,30 @@ export default {
       // 限制特征数量以防止性能问题
       const maxFeatures = 15;
       const displayFeatures = features.slice(0, maxFeatures);
+      const displayCNFeatures = displayFeatures.map(toCN);  // 转换为中文
       const displayMatrix = matrix.slice(0, maxFeatures).map(row => row.slice(0, maxFeatures));
 
       const option = {
         tooltip: {
-          position: 'top'
+          position: 'top',
+          formatter: (params) => {
+            const xName = displayCNFeatures[params.value[0]];
+            const yName = displayCNFeatures[displayFeatures.length - 1 - params.value[1]];
+            return `${xName} ↔ ${yName}<br/>相关系数: ${params.value[2].toFixed(4)}`;
+          }
         },
+        // 增大 bottom/left 为倾斜标签和 visualMap 留出空间
         grid: {
-          height: '70%',
-          top: '10%',
-          left: '15%',
-          right: '10%'
+          top: '5%',
+          left: '20%',
+          right: '5%',
+          bottom: '25%'
         },
         xAxis: {
           type: 'category',
-          data: displayFeatures,
+          data: displayCNFeatures,
           axisLabel: {
+            interval: 0,    // 强制显示所有标签
             rotate: 45,
             fontSize: 10
           },
@@ -226,8 +252,9 @@ export default {
         },
         yAxis: {
           type: 'category',
-          data: displayFeatures.slice().reverse(),
+          data: displayCNFeatures.slice().reverse(),
           axisLabel: {
+            interval: 0,    // 强制显示所有标签
             fontSize: 10
           },
           splitArea: {
@@ -237,10 +264,7 @@ export default {
         visualMap: {
           min: -1,
           max: 1,
-          calculable: true,
-          orient: 'horizontal',
-          left: 'center',
-          bottom: '5%'
+          show: false        // 完全隐藏横条控件
         },
         series: [{
           name: '相关系数',
@@ -250,7 +274,7 @@ export default {
           ).flat(),
           label: {
             show: true,
-            formatter: (params) => params.value[2].toFixed(2), // 移除 > 0.5 的阈值过滤，展示所有系数
+            formatter: (params) => params.value[2].toFixed(2),
             color: '#000',
             fontSize: 9
           }
