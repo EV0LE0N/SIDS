@@ -7,6 +7,7 @@ services:
     container_name: spark
     # 核心改动：显式增加 user: root 配置，并注明：“此配置旨在解决容器间数据读写的权限问题，确保 Spark 写入的 Parquet 结果能被 Web 后端无障碍读取。”
     user: root
+    command: tail -f /dev/null
     environment:
       # [CRITICAL] 将项目根目录加入 Python 搜索路径，以共享 utils.py
       - PYTHONPATH=/app
