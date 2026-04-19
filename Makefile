@@ -33,7 +33,14 @@ etl:
 	@./run_etl.sh
 	@$(MAKE) fix-perms
 
-train:
+# --- 新增：清理模型与大屏缓存文件 ---
+clean-models:
+	@echo "🧹 正在清理旧模型与前端大屏缓存数据..."
+	@rm -f data/models/*.json data/models/*.txt
+	@echo "✨ 清理完毕！"
+
+# --- 修改：在执行 train 之前，先自动执行 clean-models ---
+train: clean-models
 	@./run_train.sh
 	@$(MAKE) fix-perms
 

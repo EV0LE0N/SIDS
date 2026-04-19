@@ -21,10 +21,7 @@
             <el-icon><Search /></el-icon>
             <span>攻击检测</span>
           </el-menu-item>
-          <el-menu-item index="/eda">
-            <el-icon><DataBoard /></el-icon>
-            <span>学术探索</span>
-          </el-menu-item>
+
         </el-menu>
       </el-aside>
 
@@ -36,10 +33,7 @@
               <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
               <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
             </el-breadcrumb>
-            <div class="user-info">
-              <el-avatar :size="32" :src="userAvatar" />
-              <span class="username">管理员</span>
-            </div>
+
           </div>
         </el-header>
         
@@ -54,7 +48,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataAnalysis, Search, DataBoard } from '@element-plus/icons-vue'
+import { DataAnalysis, Search } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
@@ -65,14 +59,12 @@ const activeMenu = computed(() => route.path)
 const currentPageTitle = computed(() => {
   const routeMap = {
     '/dashboard': '态势大屏',
-    '/detect': '攻击检测',
-    '/eda': '学术探索'
+    '/detect': '攻击检测'
   }
   return routeMap[route.path] || 'SIDS'
 })
 
-// 用户头像（示例）
-const userAvatar = ref('https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png')
+
 
 // 菜单选择处理
 const handleMenuSelect = (index) => {
@@ -152,16 +144,7 @@ const handleMenuSelect = (index) => {
   align-items: center;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 
-.username {
-  font-weight: 500;
-  color: #303133;
-}
 
 .main-content {
   background-color: #f5f7fa;
