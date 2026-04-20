@@ -98,11 +98,15 @@ def predict_csv(file_content_bytes):
         label_map = {0: "正常流量", 1: "DoS攻击", 2: "暴力破解"}
         results = []
         for i, pred in enumerate(predictions):
-            results.append({
+            row_features = df_for_predict.iloc[i].to_dict()
+            item = {
                 "row_id": i + 1,
                 "type": label_map.get(int(pred), "未知"),
                 "confidence": float(max(probs[i]))
-            })
+            }
+            # 合并特征元数据
+            item.update(row_features)
+            results.append(item)
 
         # 统计信息
         stats = {
