@@ -172,6 +172,41 @@ def main():
         
         with open("/app/data/models/eda_sample.json", "w", encoding="utf-8") as f:
             json.dump(eda_data, f, ensure_ascii=False)
+        print("EDA 学术图表数据已生成：eda_sample.json")
+        
+        # =========================================================
+        # --- 核心新增：提取 Hold-out 盲测演示集 (Demo CSV) ---
+        # =========================================================
+        print("正在生成无标签的盲测演示数据集...")
+        
+        # 1. 临时拼接测试集特征与标签，用于精准分层抽样
+        df_demo = X_test.copy()
+        df_demo['Label'] = y_test.values
+        
+        demo_sampled = pd.DataFrame()
+        
+        # 2. 定向调配数据比例 (模拟真实网络环境的 7:2:1 比例)
+        sample_strategy = {0: 700, 1: 200, 2: 100} 
+        
+        for label, n_samples in sample_strategy.items():
+            subset = df_demo[df_demo['Label'] == label]
+            if len(subset) > n_samples:
+                subset = subset.sample(n=n_samples, random_state=42)
+            demo_sampled = pd.concat([demo_sampled, subset])
+            
+        # 3. 彻底打乱数据顺序 (防止前端表格出现同类数据扎堆)
+        demo_sampled = demo_sampled.sample(frac=1, random_state=42).reset_index(drop=True)
+        
+        # 4. 撕掉答案：删除 Label 列，仅保留物理特征
+        demo_blind = demo_sampled.drop(columns=['Label'])
+        
+        # 5. 导出为最终演示用的 CSV 文件
+        demo_path = "/app/data/demo_traffic.csv"
+        demo_blind.to_csv(demo_path, index=False, encoding='utf-8')
+        
+        print(f"✅ 盲测演示集已生成至：{demo_path} (共计 {len(demo_blind)} 条)")
+        
+        print("模型训练完成！")
             
     except Exception as e:
         import traceback

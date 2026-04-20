@@ -55,7 +55,46 @@ def predict_csv(file_content_bytes):
         probs = _model.predict_proba(df_for_predict)
         predictions = probs.argmax(axis=1)
 
-        # 5. 结果格式化
+        # 5. 追加聚合计算逻辑
+        
+        # attack_distribution
+        attack_distribution = {
+            "0": int((predictions == 0).sum()),
+            "1": int((predictions == 1).sum()),
+            "2": int((predictions == 2).sum())
+        }
+        
+        # top10_dst_port
+        top10_dst_port = {}
+        if "Dst Port" in df_raw.columns:
+            # 统计并取前10，将浮点数端口（如 80.0）转为整型字符串
+            port_counts = df_raw["Dst Port"].value_counts().head(10)
+            top10_dst_port = {str(int(float(k))): int(v) for k, v in port_counts.items()}
+            
+        # radar_data
+        # 提取模型认为比较重要的前 6 个特征（可固化配置）
+        radar_features = ["Tot Bwd Pkts", "Flow Pkts/s", "TotLen Bwd Pkts", "Fwd Pkt Len Mean", "Flow Duration", "Tot Fwd Pkts"]
+        # 确保这些特征在数据集中
+        radar_features = [f for f in radar_features if f in df_for_predict.columns]
+        
+        radar_data = {
+            "features": radar_features,
+            "normal": [],
+            "dos": [],
+            "bruteforce": []
+        }
+        
+        df_for_radar = df_for_predict.copy()
+        df_for_radar["predicted_label"] = predictions
+        
+        for label, key in [(0, "normal"), (1, "dos"), (2, "bruteforce")]:
+            subset = df_for_radar[df_for_radar["predicted_label"] == label]
+            if len(subset) > 0:
+                radar_data[key] = subset[radar_features].mean().fillna(0).round(4).tolist()
+            else:
+                radar_data[key] = [0.0] * len(radar_features)
+
+        # 6. 结果格式化
         label_map = {0: "正常流量", 1: "DoS攻击", 2: "暴力破解"}
         results = []
         for i, pred in enumerate(predictions):
@@ -68,12 +107,19 @@ def predict_csv(file_content_bytes):
         # 统计信息
         stats = {
             "total": len(df_for_predict),
-            "normal": int(sum(predictions == 0)),
-            "dos": int(sum(predictions == 1)),
-            "bruteforce": int(sum(predictions == 2))
+            "normal": attack_distribution["0"],
+            "dos": attack_distribution["1"],
+            "bruteforce": attack_distribution["2"]
         }
 
-        return {"stats": stats, "details": results[:100]}  # 仅返回前100条预览
+        # 新的返回契约
+        return {
+            "stats": stats,
+            "attack_distribution": attack_distribution,
+            "top10_dst_port": top10_dst_port,
+            "radar_data": radar_data,
+            "details": results[:100]
+        }
     except Exception as e:
         print(f"推理错误: {str(e)}")
         raise e

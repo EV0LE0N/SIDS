@@ -1,186 +1,117 @@
 <template>
   <div class="detect-container">
-    <el-page-header content="网络攻击检测" />
-    
-    <el-row :gutter="20" class="detect-content">
-      <!-- 左侧：文件上传和检测区域 -->
-      <el-col :span="12">
+    <el-page-header content="攻击检测模块" />
+
+    <!-- 顶部：操作与指标 -->
+    <el-row :gutter="15" class="top-row">
+      <!-- 左侧：文件上传区 -->
+      <el-col :span="6">
         <el-card shadow="hover" class="upload-card">
-          <template #header>
-            <div class="card-header">
-              <el-icon><UploadFilled /></el-icon>
-              <span>上传网络流量数据</span>
+          <el-upload
+            class="upload-area"
+            drag
+            action="#"
+            :auto-upload="false"
+            :show-file-list="false"
+            :on-change="handleFileChange"
+          >
+            <el-icon class="el-icon--upload" style="margin-bottom: 5px; font-size: 32px;"><upload-filled /></el-icon>
+            <div class="el-upload__text" style="font-size: 13px;">
+              拖拽 CSV 到此处，或 <em>点击上传</em>
             </div>
-          </template>
-          
-          <div class="upload-area">
-            <el-upload
-              class="upload-demo"
-              drag
-              action="/api/predict"
-              :headers="uploadHeaders"
-              :data="uploadData"
-              :on-success="handleUploadSuccess"
-              :on-error="handleUploadError"
-              :before-upload="beforeUpload"
-              :show-file-list="false"
-              accept=".csv"
-            >
-              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-              <div class="el-upload__text">
-                拖拽文件到此处或 <em>点击上传</em>
-              </div>
-              <div class="el-upload__tip">
-                支持 CSV 格式，文件大小不超过 500MB
-              </div>
-            </el-upload>
-            
-            <div class="upload-info">
-              <el-alert
-                title="上传说明"
-                type="info"
-                :closable="false"
-                description="上传包含网络流量特征的数据文件，系统将使用训练好的XGBoost模型进行攻击检测。"
-              />
-            </div>
-          </div>
-          
-          <div class="detect-actions">
-            <el-button 
-              type="primary" 
-              :loading="detecting" 
-              :disabled="!selectedFile"
-              @click="handleDetect"
-            >
-              <el-icon><Search /></el-icon>
-              开始检测
-            </el-button>
-            <el-button @click="resetDetection">
-              <el-icon><Refresh /></el-icon>
-              重置
-            </el-button>
-          </div>
-        </el-card>
-        
-        <!-- 检测结果 -->
-        <el-card shadow="hover" class="result-card" v-if="detectionStats">
-          <template #header>
-            <div class="card-header">
-              <el-icon><Document /></el-icon>
-              <span>检测结果</span>
-            </div>
-          </template>
-          
-          <div class="result-content">
-            <div class="result-summary">
-              <div class="result-item" :class="getResultClass(detectionStats)">
-                <div class="result-label">总体检测结果</div>
-                <div class="result-value">{{ getResultText(detectionStats) }}</div>
-              </div>
-              
-              <div class="result-stats">
-                <div class="stat-item">
-                  <div class="stat-label">处理记录数</div>
-                  <div class="stat-value">{{ detectionStats.total }}</div>
-                </div>
-              </div>
-            </div>
-            
-            <el-divider />
-            
-            <div class="result-details">
-              <div class="detail-header">详细检测结果</div>
-              <el-table
-                :data="detectionDetails"
-                stripe
-                style="width: 100%"
-                max-height="300"
-              >
-                <el-table-column prop="row_id" label="记录ID" width="100" />
-                <el-table-column prop="type" label="预测结果" width="120">
-                  <template #default="scope">
-                    <el-tag :type="getPredictionTagType(scope.row.type)">
-                      {{ scope.row.type }}
-                    </el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="confidence" label="置信度" width="140">
-                  <template #default="scope">
-                    <el-progress 
-                      :percentage="Math.round(scope.row.confidence * 100)" 
-                      :status="getConfidenceStatus(scope.row.confidence)"
-                      :show-text="false"
-                    />
-                    <span style="margin-left: 10px">{{ (scope.row.confidence * 100).toFixed(1) }}%</span>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-          </div>
+          </el-upload>
         </el-card>
       </el-col>
       
-      <!-- 右侧：检测统计和说明 -->
-      <el-col :span="12">
-        <el-card shadow="hover" class="stats-card">
-          <template #header>
-            <div class="card-header">
-              <el-icon><DataAnalysis /></el-icon>
-              <span>检测统计</span>
-            </div>
-          </template>
-          
-          <div class="stats-content">
-            <div class="stats-chart" ref="detectStatsChartRef"></div>
-            
-            <div class="stats-info">
-              <el-descriptions title="模型信息" :column="1" border>
-                <el-descriptions-item label="模型名称">XGBoost攻击检测模型</el-descriptions-item>
-                <el-descriptions-item label="训练准确率">{{ modelInfo.accuracy }}%</el-descriptions-item>
-                <el-descriptions-item label="特征数量">{{ modelInfo.feature_count }}</el-descriptions-item>
-                <el-descriptions-item label="最后训练时间">{{ modelInfo.last_trained }}</el-descriptions-item>
-              </el-descriptions>
-            </div>
-          </div>
+      <!-- 右侧：4 个横向平铺的统计卡片 (复用 Dashboard.vue 样式) -->
+      <el-col :span="18">
+        <el-row :gutter="15" style="height: 100%;">
+          <el-col :span="6">
+            <el-card shadow="hover" class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon" style="background-color: #409eff;"><el-icon><DataLine /></el-icon></div>
+                <div class="stat-info">
+                  <div class="stat-value" :title="stats.total">{{ formatNumber(stats.total) }}</div>
+                  <div class="stat-label">总检测量</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon" style="background-color: #67c23a;"><el-icon><Check /></el-icon></div>
+                <div class="stat-info">
+                  <div class="stat-value" :title="stats.normal">{{ formatNumber(stats.normal) }}</div>
+                  <div class="stat-label">正常流量</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon" style="background-color: #e6a23c;"><el-icon><Warning /></el-icon></div>
+                <div class="stat-info">
+                  <div class="stat-value" :title="stats.attack">{{ formatNumber(stats.attack) }}</div>
+                  <div class="stat-label">攻击流量</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="stat-card">
+              <div class="stat-content">
+                <div class="stat-icon" style="background-color: #f56c6c;"><el-icon><CloseBold /></el-icon></div>
+                <div class="stat-info">
+                  <div class="stat-value">{{ attackRate }}%</div>
+                  <div class="stat-label">攻击比例</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-col>
+    </el-row>
+
+    <!-- 中部：样本画像展板 (3栏均等布局的 ECharts 展板) -->
+    <el-row :gutter="15" class="main-row" v-loading="loading">
+      <el-col :span="8">
+        <el-card shadow="hover" class="chart-card">
+          <template #header><div class="card-header">攻击类型分布</div></template>
+          <div class="chart-container" ref="attackDistChartRef"></div>
         </el-card>
-        
-        <el-card shadow="hover" class="help-card">
-          <template #header>
-            <div class="card-header">
-              <el-icon><QuestionFilled /></el-icon>
-              <span>使用说明</span>
-            </div>
-          </template>
-          
-          <div class="help-content">
-            <el-steps direction="vertical" :active="4">
-              <el-step title="准备数据">
-                <template #description>
-                  <p>准备包含网络流量特征的数据文件，确保包含以下特征：</p>
-                  <ul>
-                    <li>流量持续时间、数据包大小、协议类型等</li>
-                    <li>源/目标IP地址、端口号</li>
-                    <li>流量统计特征（如包数量、字节数等）</li>
-                  </ul>
-                </template>
-              </el-step>
-              <el-step title="上传文件">
-                <template #description>
-                  <p>点击上传区域或拖拽文件到指定区域，支持CSV和Parquet格式。</p>
-                </template>
-              </el-step>
-              <el-step title="开始检测">
-                <template #description>
-                  <p>点击"开始检测"按钮，系统将使用训练好的模型进行分析。</p>
-                </template>
-              </el-step>
-              <el-step title="查看结果">
-                <template #description>
-                  <p>查看检测结果，包括总体判断、详细记录和置信度分析。</p>
-                </template>
-              </el-step>
-            </el-steps>
-          </div>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="hover" class="chart-card">
+          <template #header><div class="card-header">多维特征对比雷达图 (Top 6)</div></template>
+          <div class="chart-container" ref="radarChartRef"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="8">
+        <el-card shadow="hover" class="chart-card">
+          <template #header><div class="card-header">模型置信度分布</div></template>
+          <div class="chart-container" ref="confidenceDistChartRef"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 底部：取证明细表格 -->
+    <el-row :gutter="15" class="table-row">
+      <el-col :span="24">
+        <el-card shadow="hover">
+          <template #header><div class="card-header">取证明细表格 (前 100 条)</div></template>
+          <el-table :data="detailsData" style="width: 100%" max-height="400" v-loading="loading">
+            <el-table-column prop="row_id" label="记录 ID" width="100" />
+            <el-table-column prop="type" label="检测类型" width="150" />
+            <el-table-column label="置信度 (Confidence)">
+              <template #default="scope">
+                <el-tag :type="getConfidenceType(scope.row.confidence)">
+                  {{ (scope.row.confidence * 100).toFixed(2) }}%
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
         </el-card>
       </el-col>
     </el-row>
@@ -188,382 +119,362 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import * as echarts from 'echarts'
-import { 
-  UploadFilled, Search, Refresh, Document, 
-  DataAnalysis, QuestionFilled 
-} from '@element-plus/icons-vue'
-import { uploadPredict } from '@/api/predict'
+import { ref, computed, onMounted, onBeforeUnmount, markRaw, nextTick } from 'vue';
+import * as echarts from 'echarts';
+import { ElMessage } from 'element-plus';
+import { DataLine, Check, Warning, CloseBold, UploadFilled } from '@element-plus/icons-vue';
+// 假设 uploadPredict 已经根据规范在 api/predict.js 中实现
+import { uploadPredict } from '@/api/predict';
 
-// 上传相关
-const selectedFile = ref(null)
-const detecting = ref(false)
-const uploadHeaders = ref({
-  'Content-Type': 'multipart/form-data'
-})
-const uploadData = ref({})
+// 加载状态
+const loading = ref(false);
 
-// 检测结果（严格使用 stats + details 二元结构）
-const detectionStats = ref(null)
-const detectionDetails = ref([])
+// 顶部统计卡片数据
+const stats = ref({
+  total: 0,
+  normal: 0,
+  attack: 0
+});
 
-// 模型信息
-const modelInfo = ref({
-  accuracy: '85.3',
-  feature_count: 42,
-  last_trained: '2024-01-15'
-})
+const attackRate = computed(() => {
+  return stats.value.total > 0 
+    ? ((stats.value.attack / stats.value.total) * 100).toFixed(2) 
+    : 0;
+});
+
+// 表格明细数据
+const detailsData = ref([]);
+
+// 格式化大数字
+const formatNumber = (num) => {
+  if (num >= 10000) {
+    return (num / 10000).toFixed(1) + 'w';
+  }
+  return num;
+};
+
+// 置信度 tag 类型计算
+const getConfidenceType = (confidence) => {
+  if (confidence >= 0.9) return 'danger';
+  if (confidence >= 0.8) return 'warning';
+  return 'info';
+};
+
+// 英文特征名 → 中文名称映射字典 (复刻 Dashboard.vue)
+const FEATURE_CN_MAP = {
+  'Flow Duration':    '流持续时间',
+  'Tot Fwd Pkts':     '前向包总数',
+  'Tot Bwd Pkts':     '后向包总数',
+  'TotLen Fwd Pkts':  '前向包总长度',
+  'TotLen Bwd Pkts':  '后向包总长度',
+  'Fwd Pkt Len Max':  '前向包最大长度',
+  'Fwd Pkt Len Min':  '前向包最小长度',
+  'Fwd Pkt Len Mean': '前向包平均长度',
+  'Flow Byts/s':      '流字节速率',
+  'Flow Pkts/s':      '流包速率',
+  'Bwd Pkt Len Max':  '后向包最大长度',
+  'Bwd Pkt Len Min':  '后向包最小长度',
+  'Bwd Pkt Len Mean': '后向包平均长度',
+  'Flow IAT Mean':    '流间隔均值',
+  'Flow IAT Max':     '流间隔最大值',
+};
+
+const toCN = (name) => FEATURE_CN_MAP[name] || name;
+
+// DOM 引用
+const attackDistChartRef = ref(null);
+const radarChartRef = ref(null);
+const confidenceDistChartRef = ref(null);
 
 // 图表实例
-const detectStatsChart = ref(null)
-const detectStatsChartRef = ref(null)
+const attackDistChart = ref(null);
+const radarChart = ref(null);
+const confidenceDistChart = ref(null);
 
-// 上传前处理
-const beforeUpload = (file) => {
-  const isCSV = file.name.toLowerCase().endsWith('.csv')
-  const isLt500M = file.size / 1024 / 1024 < 500
-  
-  if (!isCSV) {
-    ElMessage.error('只能上传 CSV 格式的文件!')
-    return false
-  }
-  if (!isLt500M) {
-    ElMessage.error('文件大小不能超过 500MB!')
-    return false
-  }
-  
-  selectedFile.value = file
-  return true
-}
+// 基础图表配置 (复刻 Dashboard.vue)
+const attackDistOption = ref({
+  tooltip: { trigger: 'item' },
+  legend: { bottom: 0, left: 'center' },
+  series: [{
+    name: '攻击类型分布',
+    type: 'pie',
+    radius: ['40%', '70%'],
+    avoidLabelOverlap: false,
+    itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+    label: { show: false, position: 'center' },
+    emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
+    labelLine: { show: false },
+    data: []
+  }]
+});
 
-// 上传成功处理
-const handleUploadSuccess = (response, file) => {
-  ElMessage.success('文件上传成功！')
-  selectedFile.value = file
-}
+const radarOption = ref({
+  title: { text: '' },
+  tooltip: { trigger: 'item' },
+  legend: { data: ['正常流量', 'DoS/DDoS攻击', '暴力破解攻击'], bottom: 0 },
+  radar: {
+    indicator: [],
+    radius: '60%',
+    splitNumber: 5,
+    axisName: { color: '#909399' },
+    splitArea: { show: false },
+    splitLine: { lineStyle: { color: 'rgba(238, 238, 238, 0.5)' } }
+  },
+  series: [{
+    name: '特征维度对比',
+    type: 'radar',
+    data: []
+  }]
+});
 
-// 上传错误处理
-const handleUploadError = (error, file) => {
-  console.error('上传失败:', error)
-  ElMessage.error('文件上传失败，请重试！')
-  selectedFile.value = null
-}
-
-// 开始检测
-const handleDetect = async () => {
-  if (!selectedFile.value) {
-    ElMessage.warning('请先选择要检测的文件')
-    return
-  }
-  
-  detecting.value = true
-  
-  try {
-    const formData = new FormData()
-    formData.append('file', selectedFile.value)
-    
-    const response = await uploadPredict(formData)
-    // API 返回结构：{ status: 'success', result: { stats: {...}, details: [...] } }
-    const resultData = response.result
-    detectionStats.value = resultData.stats
-    detectionDetails.value = resultData.details
-    
-    // 更新统计图表
-    updateStatsChart(resultData.stats)
-    
-    ElMessage.success('检测完成！')
-  } catch (error) {
-    console.error('检测失败:', error)
-    ElMessage.error('检测失败：' + (error.message || '未知错误'))
-  } finally {
-    detecting.value = false
-  }
-}
-
-// 重置检测
-const resetDetection = () => {
-  ElMessageBox.confirm('确定要重置检测结果吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    selectedFile.value = null
-    detectionStats.value = null
-    detectionDetails.value = []
-    ElMessage.success('已重置')
-  }).catch(() => {})
-}
-
-// 获取结果样式类
-const getResultClass = (stats) => {
-  if (!stats) return 'result-normal'
-  const hasAttack = (stats.dos || 0) + (stats.bruteforce || 0) > 0
-  return hasAttack ? 'result-attack' : 'result-normal'
-}
-
-// 获取结果文本
-const getResultText = (stats) => {
-  if (!stats) return '未知状态'
-  const hasAttack = (stats.dos || 0) + (stats.bruteforce || 0) > 0
-  return hasAttack ? '检测到攻击' : '正常流量'
-}
-
-// 获取预测标签类型
-const getPredictionTagType = (type) => {
-  if (type === '正常流量') return 'success'
-  if (type === 'DoS攻击') return 'danger'
-  if (type === '暴力破解') return 'warning'
-  return 'info'
-}
-
-// 获取置信度状态
-const getConfidenceStatus = (confidence) => {
-  if (confidence >= 0.9) return 'success'
-  if (confidence >= 0.7) return 'warning'
-  return 'exception'
-}
-
-// 更新统计图表
-const updateStatsChart = (stats) => {
-  if (!detectStatsChart.value || !stats) return
-   
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      top: 'center'
-    },
-    series: [
-      {
-        name: '检测结果分布',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        center: ['60%', '50%'],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 10,
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        label: {
-          show: false,
-          position: 'center'
-        },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: 16,
-            fontWeight: 'bold'
-          }
-        },
-        labelLine: {
-          show: false
-        },
-        data: [
-          { value: stats.normal || 0, name: '正常流量' },
-          { value: stats.dos || 0, name: 'DoS/DDoS攻击' },
-          { value: stats.bruteforce || 0, name: '暴力破解攻击' }
-        ]
-      }
-    ]
-  }
-  
-  detectStatsChart.value.setOption(option)
-}
-
-// 初始化图表
-onMounted(() => {
-  if (detectStatsChartRef.value) {
-    detectStatsChart.value = echarts.init(detectStatsChartRef.value)
-    
-    // 初始空图表
-    const initialOption = {
-      title: {
-        text: '暂无检测数据',
-        left: 'center',
-        top: 'center',
-        textStyle: {
-          color: '#999',
-          fontSize: 14,
-          fontWeight: 'normal'
-        }
-      },
-      graphic: {
-        type: 'text',
-        left: 'center',
-        top: '45%',
-        style: {
-          text: '请上传文件开始检测',
-          fill: '#ccc',
-          fontSize: 12
-        }
-      }
+const confidenceDistOption = ref({
+  tooltip: { 
+    trigger: 'axis', 
+    axisPointer: { type: 'shadow' },
+    formatter: function (params) {
+      const p = params[0];
+      return p.name + ' 区间<br/>记录条数: ' + p.value;
     }
-    detectStatsChart.value.setOption(initialOption)
+  },
+  grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+  xAxis: { 
+    type: 'category', 
+    data: ['>0.95', '0.9-0.95', '0.8-0.9', '<0.8'], 
+    axisLabel: { rotate: 0 } 
+  },
+  yAxis: { type: 'value' },
+  series: [{
+    name: '记录条数',
+    type: 'bar',
+    barWidth: '60%',
+    data: [],
+    itemStyle: {
+      color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: '#83bff6' },
+        { offset: 0.5, color: '#188df0' },
+        { offset: 1, color: '#188df0' }
+      ])
+    }
+  }]
+});
+
+const resizeAllCharts = () => {
+  attackDistChart.value?.resize();
+  radarChart.value?.resize();
+  confidenceDistChart.value?.resize();
+};
+
+onMounted(() => {
+  attackDistChart.value = markRaw(echarts.init(attackDistChartRef.value));
+  radarChart.value = markRaw(echarts.init(radarChartRef.value));
+  confidenceDistChart.value = markRaw(echarts.init(confidenceDistChartRef.value));
+  
+  // 初始化空图表
+  attackDistChart.value.setOption(attackDistOption.value);
+  radarChart.value.setOption(radarOption.value);
+  confidenceDistChart.value.setOption(confidenceDistOption.value);
+
+  window.addEventListener('resize', resizeAllCharts);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeAllCharts);
+  if (attackDistChart.value) attackDistChart.value.dispose();
+  if (radarChart.value) radarChart.value.dispose();
+  if (confidenceDistChart.value) confidenceDistChart.value.dispose();
+});
+
+// 文件上传与预测逻辑
+const handleFileChange = async (file) => {
+  if (!file.name.endsWith('.csv')) {
+    ElMessage.error('仅支持 CSV 格式文件');
+    return;
   }
   
-  // 监听窗口大小变化
-  window.addEventListener('resize', handleResize)
-})
-
-// 处理窗口大小变化
-const handleResize = () => {
-  if (detectStatsChart.value) {
-    detectStatsChart.value.resize()
+  const formData = new FormData();
+  formData.append('file', file.raw);
+  
+  loading.value = true;
+  try {
+    const response = await uploadPredict(formData);
+    const res = response.result;
+    
+    // 更新统计数据
+    stats.value.total = res.stats.total;
+    stats.value.normal = res.stats.normal;
+    stats.value.attack = res.stats.dos + res.stats.bruteforce;
+    
+    // 更新攻击类型分布饼图
+    if (res.attack_distribution) {
+      attackDistOption.value.series[0].data = [
+        { value: res.attack_distribution['0'] || 0, name: '正常流量' },
+        { value: res.attack_distribution['1'] || 0, name: 'DoS/DDoS攻击' },
+        { value: res.attack_distribution['2'] || 0, name: '暴力破解攻击' }
+      ];
+      attackDistChart.value?.setOption(attackDistOption.value);
+    }
+    
+    // 更新置信度分布柱状图
+    if (res.details) {
+      let count1 = 0; // >0.95
+      let count2 = 0; // 0.9-0.95
+      let count3 = 0; // 0.8-0.9
+      let count4 = 0; // <0.8
+      
+      res.details.forEach(item => {
+        const conf = item.confidence;
+        if (conf > 0.95) count1++;
+        else if (conf >= 0.9) count2++;
+        else if (conf >= 0.8) count3++;
+        else count4++;
+      });
+      
+      confidenceDistOption.value.series[0].data = [count1, count2, count3, count4];
+      confidenceDistChart.value?.setOption(confidenceDistOption.value);
+    }
+    
+    // 更新雷达图
+    if (res.radar_data) {
+      const { features, normal, dos, bruteforce } = res.radar_data;
+      radarOption.value.radar.indicator = features.map(f => ({ name: toCN(f) }));
+      radarOption.value.series[0].data = [
+        { value: normal, name: '正常流量', areaStyle: { color: 'rgba(103, 194, 58, 0.3)' } },
+        { value: dos, name: 'DoS/DDoS攻击', areaStyle: { color: 'rgba(230, 162, 60, 0.3)' } },
+        { value: bruteforce, name: '暴力破解攻击', areaStyle: { color: 'rgba(245, 108, 108, 0.3)' } }
+      ];
+      radarChart.value?.setOption(radarOption.value);
+    }
+    
+    // 更新明细表格
+    detailsData.value = res.details || [];
+    
+    ElMessage.success('检测与画像生成完成');
+  } catch (err) {
+    console.error('检测失败', err);
+    ElMessage.error(err.message || '检测失败，请稍后重试');
+  } finally {
+    loading.value = false;
   }
-}
-
-// 组件卸载时清理
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  if (detectStatsChart.value) {
-    detectStatsChart.value.dispose()
-  }
-})
+};
 </script>
 
 <style scoped>
 .detect-container {
   padding: 20px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
 }
 
-.detect-content {
-  margin-top: 20px;
+.top-row {
+  margin-top: 15px;
+}
+
+.main-row {
+  margin-top: 15px;
+}
+
+.table-row {
+  margin-top: 15px;
 }
 
 .card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: bold;
-  font-size: 16px;
+  font-size: 15px;
   color: #303133;
 }
 
-.upload-card,
-.result-card,
-.stats-card,
-.help-card {
-  margin-bottom: 20px;
+.chart-card {
+  transition: all 0.3s ease;
+  background: #fff;
+}
+.chart-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
 }
 
-.upload-area {
-  padding: 20px;
+.chart-container {
+  width: 100%;
+  height: 350px;
 }
 
-.upload-info {
-  margin-top: 20px;
-}
-
-.detect-actions {
-  margin-top: 20px;
+/* 上传区域调整 */
+.upload-card {
+  height: 100px;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
   justify-content: center;
 }
-
-.result-content {
-  padding: 10px;
+:deep(.upload-card .el-card__body) {
+  padding: 0;
+  height: 100%;
 }
-
-.result-summary {
+:deep(.upload-area) {
+  height: 100%;
+}
+:deep(.upload-area .el-upload) {
+  height: 100%;
+}
+:deep(.upload-area .el-upload-dragger) {
+  height: 100%;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  margin-bottom: 20px;
+  justify-content: center;
+  border: none;
+  border-radius: 0;
 }
 
-.result-item {
+/* 顶部统计卡片 - 物理复用 Dashboard.vue 样式 */
+.stat-card {
+  height: 100px;
+  cursor: default;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px 0 rgba(0,0,0,.1) !important;
+}
+:deep(.stat-card .el-card__body) {
   padding: 15px 25px;
-  border-radius: 8px;
-  text-align: center;
-  min-width: 200px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.result-normal {
-  background-color: #f0f9eb;
-  border: 1px solid #e1f3d8;
-  color: #67c23a;
-}
-
-.result-attack {
-  background-color: #fef0f0;
-  border: 1px solid #fde2e2;
-  color: #f56c6c;
-}
-
-.result-label {
-  font-size: 14px;
-  color: #909399;
-  margin-bottom: 5px;
-}
-
-.result-value {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-.result-stats {
+.stat-content {
   display: flex;
-  gap: 30px;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
 }
 
-.stat-item {
-  text-align: center;
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
 }
 
-.stat-label {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 5px;
+.stat-info {
+  flex: 1;
+  overflow: hidden;
 }
 
 .stat-value {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: bold;
   color: #303133;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
-.detail-header {
-  font-size: 16px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 15px;
-}
-
-.stats-content {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.stats-chart {
-  width: 100%;
-  height: 300px;
-}
-
-.stats-info {
-  margin-top: 10px;
-}
-
-.help-content {
-  padding: 10px;
-}
-
-.help-content ul {
-  margin: 5px 0;
-  padding-left: 20px;
-  color: #606266;
-}
-
-.help-content li {
-  margin: 3px 0;
-  font-size: 13px;
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+  margin-top: 6px;
 }
 </style>
