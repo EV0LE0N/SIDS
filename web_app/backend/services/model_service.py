@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import io
 # 注意：模块导入通过 PYTHONPATH=/app 环境变量保证，无需 sys.path.append
-from utils import clean_data_logic, CORE_FEATURES
+from utils import clean_data_logic, CORE_FEATURES, ATTACK_LABEL_MAP
 
 # 全局变量缓存模型
 _model = None
@@ -98,15 +98,11 @@ def predict_csv(file_content_bytes):
         label_map = {0: "正常流量", 1: "DoS攻击", 2: "暴力破解"}
         results = []
         for i, pred in enumerate(predictions):
-            row_features = df_for_predict.iloc[i].to_dict()
-            item = {
+            results.append({
                 "row_id": i + 1,
                 "type": label_map.get(int(pred), "未知"),
                 "confidence": float(max(probs[i]))
-            }
-            # 合并特征元数据
-            item.update(row_features)
-            results.append(item)
+            })
 
         # 统计信息
         stats = {
@@ -127,3 +123,41 @@ def predict_csv(file_content_bytes):
     except Exception as e:
         print(f"推理错误: {str(e)}")
         raise e
+
+
+def batch_predict(df_features: pd.DataFrame) -> list[dict]:
+    """
+    微批推理接口：接收已对齐的 15 维特征 DataFrame，返回每行的预测结果。
+
+    职责边界：
+    - 只做推理 + 标签映射，不做统计聚合（统计由调用方负责）
+    - 使用 ATTACK_LABEL_MAP 动态映射数值类别，禁止硬编码分类字符串
+
+    Args:
+        df_features: 列严格按 CORE_FEATURES 顺序排列的 Pandas DataFrame
+
+    Returns:
+        [{"attack_type": str, "confidence": float}, ...] 与行数等长的列表
+
+    Raises:
+        RuntimeError: 模型未加载时抛出
+        Exception: XGBoost 推理本身异常时向上透传
+    """
+    global _model
+    if _model is None:
+        load_model()
+        if _model is None:
+            raise RuntimeError("模型服务不可用，请先执行 make train 生成 xgb_model.json")
+
+    # predict_proba 返回形状 (n_samples, n_classes) 的概率矩阵
+    probs = _model.predict_proba(df_features)          # shape: (n, 3)
+    pred_labels = probs.argmax(axis=1)                  # 取概率最大的类别索引
+
+    results = []
+    for i, label_idx in enumerate(pred_labels):
+        # 动态查映射表，禁止硬编码 "Normal"/"DoS"/"BruteForce"
+        attack_type = ATTACK_LABEL_MAP.get(int(label_idx), "Unknown")
+        confidence = round(float(probs[i][label_idx]), 4)
+        results.append({"attack_type": attack_type, "confidence": confidence})
+
+    return results
