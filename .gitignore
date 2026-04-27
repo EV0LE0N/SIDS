@@ -28,3 +28,6 @@ web_app/frontend/dist/
 
 CLAUDE.md
 GEMINI.md
+
+thesis/*
+SIDS-SOP（Security Operations Platform）业务系统重构升级方案.md

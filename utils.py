@@ -12,6 +12,15 @@ CORE_FEATURES = [
     "Bwd Pkt Len Max", "Bwd Pkt Len Min", "Bwd Pkt Len Mean",
     "Flow IAT Mean", "Flow IAT Max"
 ]
+# 攻击类型映射表：数据驱动设计，系统中所有分类判断必须动态读取此表
+# 禁止在其他模块中硬编码分类字符串（如 "Normal"、"DoS"）
+# 未来升级至 5 分类只需在此处追加键值对，全系统零成本同步
+ATTACK_LABEL_MAP = {
+    0: "Normal",
+    1: "DoS",
+    2: "BruteForce",
+}
+
 LABEL_COL = "Label"
 
 def get_spark_schema():

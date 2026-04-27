@@ -6,3 +6,4 @@ pandas
 duckdb
 scikit-learn
 python-multipart
+httpx
