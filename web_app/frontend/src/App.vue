@@ -13,9 +13,13 @@
           @select="handleMenuSelect"
           router
         >
+          <el-menu-item index="/sop">
+            <el-icon><Monitor /></el-icon>
+            <span>安全运营态势</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard">
             <el-icon><DataAnalysis /></el-icon>
-            <span>态势大屏</span>
+            <span>学术分析大屏</span>
           </el-menu-item>
           <el-menu-item index="/detect">
             <el-icon><Search /></el-icon>
@@ -48,7 +52,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataAnalysis, Search } from '@element-plus/icons-vue'
+import { DataAnalysis, Search, Monitor } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
@@ -58,8 +62,9 @@ const activeMenu = computed(() => route.path)
 // 计算当前页面标题
 const currentPageTitle = computed(() => {
   const routeMap = {
-    '/dashboard': '态势大屏',
-    '/detect': '攻击检测'
+    '/sop':       '安全运营态势',
+    '/dashboard': '学术分析大屏',
+    '/detect':    '攻击检测'
   }
   return routeMap[route.path] || 'SIDS'
 })
