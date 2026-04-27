@@ -33,60 +33,65 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # 模板键使用 ATTACK_LABEL_MAP 的值（字符串），保证数据驱动一致性
+# 注意：攻击类特征相较正常流量有意做成数量级差距，确保 XGBoost 能明确识别
 _BASELINE_PROFILES: dict[str, dict[str, float]] = {
     # --- Normal：正常 HTTP/HTTPS 浏览流量，双向包均衡，流量适中 ---
     ATTACK_LABEL_MAP[0]: {
-        "Flow Duration":   500000.0,   # 流持续时间 (μs)，正常会话较长
-        "Tot Fwd Pkts":       25.0,    # 前向数据包总数
-        "Tot Bwd Pkts":       20.0,    # 后向数据包总数（响应）
-        "TotLen Fwd Pkts":  3200.0,    # 前向总字节
-        "TotLen Bwd Pkts":  8000.0,    # 后向总字节（响应体通常更大）
-        "Fwd Pkt Len Max":   512.0,    # 前向包最大长度
-        "Fwd Pkt Len Min":    64.0,    # 前向包最小长度
-        "Fwd Pkt Len Mean":  128.0,    # 前向包平均长度
-        "Flow Byts/s":      2000.0,    # 流字节率
-        "Flow Pkts/s":        10.0,    # 流包率
-        "Bwd Pkt Len Max":   800.0,    # 后向包最大长度
-        "Bwd Pkt Len Min":    40.0,    # 后向包最小长度
-        "Bwd Pkt Len Mean":  400.0,    # 后向包平均长度
-        "Flow IAT Mean":   20000.0,    # 流间隔平均时间 (μs)
-        "Flow IAT Max":   100000.0,    # 流间隔最大时间 (μs)
-    },
-    # --- DoS：洪泛攻击，前向高频小包，后向几乎无响应，包率极高 ---
-    ATTACK_LABEL_MAP[1]: {
-        "Flow Duration":    50000.0,   # 流持续时间极短（高频建连）
-        "Tot Fwd Pkts":      200.0,    # 前向大量数据包
-        "Tot Bwd Pkts":        2.0,    # 服务器几乎无响应
-        "TotLen Fwd Pkts":  1200.0,    # 小包洪泛，总量不大
-        "TotLen Bwd Pkts":    80.0,    # 后向响应极少
-        "Fwd Pkt Len Max":    64.0,    # 包极小（SYN/ACK 洪泛）
-        "Fwd Pkt Len Min":    40.0,
-        "Fwd Pkt Len Mean":   48.0,
-        "Flow Byts/s":     80000.0,    # 字节率高
-        "Flow Pkts/s":      4000.0,    # 包率极高，是 DoS 核心特征
-        "Bwd Pkt Len Max":    80.0,
-        "Bwd Pkt Len Min":    40.0,
-        "Bwd Pkt Len Mean":   60.0,
-        "Flow IAT Mean":     200.0,    # 包间隔极短（密集轰炸）
-        "Flow IAT Max":     1000.0,
-    },
-    # --- BruteForce：暴力破解（SSH/FTP），周期性重试，包数少但规律 ---
-    ATTACK_LABEL_MAP[2]: {
-        "Flow Duration":  2000000.0,   # 流时间长（多次重试）
-        "Tot Fwd Pkts":       10.0,    # 每次尝试包数少
-        "Tot Bwd Pkts":        8.0,    # 服务端有响应（返回错误码）
-        "TotLen Fwd Pkts":   800.0,    # 单次认证请求体小
-        "TotLen Bwd Pkts":   600.0,    # 服务端错误响应
-        "Fwd Pkt Len Max":   256.0,
+        "Flow Duration":   500000.0,   # 正常会话持续时间适中 (μs)
+        "Tot Fwd Pkts":       25.0,
+        "Tot Bwd Pkts":       20.0,
+        "TotLen Fwd Pkts":  3200.0,
+        "TotLen Bwd Pkts":  8000.0,
+        "Fwd Pkt Len Max":   512.0,
         "Fwd Pkt Len Min":    64.0,
         "Fwd Pkt Len Mean":  128.0,
-        "Flow Byts/s":       400.0,    # 字节率低（每次请求间隔长）
-        "Flow Pkts/s":         4.0,
-        "Bwd Pkt Len Max":   200.0,
-        "Bwd Pkt Len Min":    50.0,
-        "Bwd Pkt Len Mean":  120.0,
-        "Flow IAT Mean":  200000.0,    # 包间隔大（等待服务端响应后重试）
-        "Flow IAT Max":  1000000.0,
+        "Flow Byts/s":      2000.0,
+        "Flow Pkts/s":        10.0,
+        "Bwd Pkt Len Max":   800.0,
+        "Bwd Pkt Len Min":    40.0,
+        "Bwd Pkt Len Mean":  400.0,
+        "Flow IAT Mean":   20000.0,
+        "Flow IAT Max":   100000.0,
+    },
+    # --- DoS：SYN/UDP 洪泛，特征极端夸张 ---
+    # 核心特征：Flow Pkts/s 和 Flow Byts/s 拉到极高，Flow Duration 极短，
+    # 包长度极小且高度统一（小包洪泛），后向包几乎为零（服务端无法响应）
+    ATTACK_LABEL_MAP[1]: {
+        "Flow Duration":      500.0,   # 极短（μs），高频快速建连
+        "Tot Fwd Pkts":     5000.0,    # 海量前向包
+        "Tot Bwd Pkts":        0.0,    # 服务端完全无响应
+        "TotLen Fwd Pkts": 200000.0,   # 总字节量极大
+        "TotLen Bwd Pkts":     0.0,
+        "Fwd Pkt Len Max":    40.0,    # SYN 包极小（40 bytes TCP头）
+        "Fwd Pkt Len Min":    40.0,    # 高度统一，无正常流量的随机性
+        "Fwd Pkt Len Mean":   40.0,
+        "Flow Byts/s":  5000000.0,     # 5MB/s 字节率（比正常高3个数量级）
+        "Flow Pkts/s":    50000.0,     # 5万包/秒（比正常高4个数量级）
+        "Bwd Pkt Len Max":     0.0,
+        "Bwd Pkt Len Min":     0.0,
+        "Bwd Pkt Len Mean":    0.0,
+        "Flow IAT Mean":      10.0,    # 包间隔极短（10μs，密集轰炸）
+        "Flow IAT Max":      100.0,
+    },
+    # --- BruteForce：SSH/FTP 密码爆破，超长流 + 极低发包率 + 包含加密握手延迟 ---
+    # 来源：CSE-CIC-IDS2018 真实 SSH-Patator 流量统计特征
+    # 关键：Flow Pkts/s 极低（2.6pps）是模型识别暴破的核心决策边界
+    ATTACK_LABEL_MAP[2]: {
+        "Flow Duration":  15000000.0,  # 15秒超长流 (SSH 握手与认证等待)
+        "Tot Fwd Pkts":       20.0,
+        "Tot Bwd Pkts":       20.0,
+        "TotLen Fwd Pkts":  1000.0,
+        "TotLen Bwd Pkts":  2000.0,
+        "Fwd Pkt Len Max":   200.0,
+        "Fwd Pkt Len Min":     0.0,
+        "Fwd Pkt Len Mean":   50.0,
+        "Flow Byts/s":       200.0,    # 极低字节率
+        "Flow Pkts/s":         2.6,    # 极低发包率（模型识别暴破的核心决策边界）
+        "Bwd Pkt Len Max":   300.0,
+        "Bwd Pkt Len Min":     0.0,
+        "Bwd Pkt Len Mean":  100.0,
+        "Flow IAT Mean":  500000.0,    # 极大包间隔（等待服务器响应）
+        "Flow IAT Max":  5000000.0,
     },
 }
 
