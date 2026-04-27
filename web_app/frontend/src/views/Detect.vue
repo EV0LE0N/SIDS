@@ -104,19 +104,13 @@
           <el-table :data="detailsData" style="width: 100%" max-height="400" v-loading="loading">
             <el-table-column prop="row_id" label="记录 ID" width="100" />
             <el-table-column prop="type" label="检测类型" width="150" />
-            <el-table-column label="置信度" width="120">
+            <el-table-column label="置信度 (Confidence)">
               <template #default="scope">
                 <el-tag :type="getConfidenceType(scope.row.confidence)">
                   {{ (scope.row.confidence * 100).toFixed(2) }}%
                 </el-tag>
               </template>
             </el-table-column>
-            <!-- 新增特征元数据列 -->
-            <el-table-column prop="Flow Duration" label="持续时间" width="120" sortable />
-            <el-table-column prop="Tot Fwd Pkts" label="前向包数" width="100" sortable />
-            <el-table-column prop="Tot Bwd Pkts" label="后向包数" width="100" sortable />
-            <el-table-column prop="Fwd Pkt Len Mean" label="前向平均长度" width="130" sortable />
-            <el-table-column prop="Flow Byts/s" label="流速率(B/s)" min-width="120" sortable />
           </el-table>
         </el-card>
       </el-col>

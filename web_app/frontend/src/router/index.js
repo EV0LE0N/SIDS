@@ -1,11 +1,21 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Dashboard from '@/views/Dashboard.vue';
 import Detect from '@/views/Detect.vue';
+import SopDashboard from '@/views/SopDashboard.vue';
 
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/sop',
+  },
+  {
+    path: '/sop',
+    name: 'SopDashboard',
+    component: SopDashboard,
+    meta: {
+      title: '安全运营态势中心',
+      icon: 'Monitor',
+    },
   },
   {
     path: '/dashboard',
