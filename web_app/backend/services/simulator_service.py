@@ -73,25 +73,25 @@ _BASELINE_PROFILES: dict[str, dict[str, float]] = {
         "Flow IAT Mean":      10.0,    # 包间隔极短（10μs，密集轰炸）
         "Flow IAT Max":      100.0,
     },
-    # --- BruteForce：SSH/FTP 密码爆破，超长流 + 极低发包率 + 包含加密握手延迟 ---
-    # 来源：CSE-CIC-IDS2018 真实 SSH-Patator 流量统计特征
-    # 关键：Flow Pkts/s 极低（2.6pps）是模型识别暴破的核心决策边界
+
+    # --- BruteForce：基于 DuckDB 提取的真实均值校准 ---
+    # --- BruteForce：基于 DuckDB 提取的真实中位数 (Median) 纯血基线 ---
     ATTACK_LABEL_MAP[2]: {
-        "Flow Duration":  15000000.0,  # 15秒超长流 (SSH 握手与认证等待)
-        "Tot Fwd Pkts":       20.0,
-        "Tot Bwd Pkts":       20.0,
-        "TotLen Fwd Pkts":  1000.0,
-        "TotLen Bwd Pkts":  2000.0,
-        "Fwd Pkt Len Max":   200.0,
-        "Fwd Pkt Len Min":     0.0,
-        "Fwd Pkt Len Mean":   50.0,
-        "Flow Byts/s":       200.0,    # 极低字节率
-        "Flow Pkts/s":         2.6,    # 极低发包率（模型识别暴破的核心决策边界）
-        "Bwd Pkt Len Max":   300.0,
-        "Bwd Pkt Len Min":     0.0,
-        "Bwd Pkt Len Mean":  100.0,
-        "Flow IAT Mean":  500000.0,    # 极大包间隔（等待服务器响应）
-        "Flow IAT Max":  5000000.0,
+        "Flow Duration": 6.0,
+        "Tot Fwd Pkts": 1.0,
+        "Tot Bwd Pkts": 1.0,
+        "TotLen Fwd Pkts": 0.0,
+        "TotLen Bwd Pkts": 0.0,
+        "Fwd Pkt Len Max": 0.0,
+        "Fwd Pkt Len Min": 0.0,
+        "Fwd Pkt Len Mean": 0.0,
+        "Flow Byts/s": 0.0,
+        "Flow Pkts/s": 333333.3333,
+        "Bwd Pkt Len Max": 0.0,
+        "Bwd Pkt Len Min": 0.0,
+        "Bwd Pkt Len Mean": 0.0,
+        "Flow IAT Mean": 6.0,
+        "Flow IAT Max": 6.0,
     },
 }
 
