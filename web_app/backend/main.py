@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import stats, predict, realtime, simulator, ws
+from routers import stats, predict, realtime, simulator, ws, assets
 from services.model_service import load_model, get_model_status
-from services.simulator_service import stop_simulator
+from services.simulator_service import stop_replay
 from services import db_service
 import os
 
@@ -26,14 +26,14 @@ async def lifespan(app: FastAPI):
     yield  # 应用正常运行期间挂起在此
 
     # --- 关闭阶段：优雅终止所有后台任务，防止内存泄漏 ---
-    print("系统正在关闭，终止仿真器后台任务...")
-    await stop_simulator()
+    print("系统正在关闭，终止回放引擎后台任务...")
+    await stop_replay()
     print("系统资源已释放，关闭完成。")
 
 
 app = FastAPI(
     title="网络攻击检测系统API",
-    version="2.3.0",
+    version="3.0.0",
     lifespan=lifespan,
 )
 
@@ -52,6 +52,7 @@ app.include_router(stats.router, prefix="/api")
 app.include_router(predict.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(simulator.router, prefix="/api")
+app.include_router(assets.router, prefix="/api")
 app.include_router(ws.router)   # WebSocket 路由：无 /api 前缀，路径为 /ws/alerts
 
 # 健康检查 (增强版)

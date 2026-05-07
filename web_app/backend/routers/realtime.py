@@ -126,7 +126,8 @@ async def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
 
     # --- Step 2: XGBoost 推理 ---
     try:
-        predictions = batch_predict(df_features)
+        # XGBoost 推理为 CPU 密集型同步操作，放入线程池避免阻塞主事件循环
+        predictions = await asyncio.to_thread(batch_predict, df_features)
     except RuntimeError as e:
         # 模型未加载（xgb_model.json 不存在）
         logger.error("模型不可用: %s", e)
@@ -146,7 +147,8 @@ async def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
         df_log["attack_type"] = [p["attack_type"] for p in predictions]
         df_log["confidence"] = [p["confidence"] for p in predictions]
 
-        db_service.insert_batch(df_log)
+        # DuckDB 写入包含磁盘 I/O 和可能的 Checkpoint，放入线程池避免阻塞主事件循环
+        await asyncio.to_thread(db_service.insert_batch, df_log)
 
     except Exception as e:
         # DuckDB 写入失败不阻断响应，记录日志后继续返回推理结果
@@ -171,6 +173,142 @@ async def predict_batch(request: BatchPredictRequest) -> BatchPredictResponse:
 
 
 # =============================================================================
+# EWMA 节点级杀伤链早期探测引擎（Early Kill-Chain Detection）
+#
+# 设计哲学：
+#   不预测"全局攻击量"（天气预报式废话），而是追踪每个 IP 在每种攻击
+#   类型上的微观趋势，找出"正在冒头、即将爆发"的高危节点。
+#   输出维度：按攻击类型分组的 Top N 高危节点排行榜。
+#
+# 内存防护：
+#   采用 LRU 淘汰策略，超过 MAX_TRACKED_NODES 的节点自动被移除，
+#   防止恶意 IP 池无限膨胀导致 OOM。
+# =============================================================================
+
+import time as _time
+from collections import OrderedDict
+
+# 最多追踪的 (ip, attack_type) 组合数量
+_MAX_TRACKED_NODES = 500
+# 每种攻击类型输出的高危节点数
+_TOP_N = 3
+
+
+class _NodeEWMAState:
+    """单个 (ip, attack_type) 节点的 EWMA 微观状态"""
+    __slots__ = ("ewma", "prev_ewma", "hit_count", "last_seen")
+
+    def __init__(self):
+        self.ewma: float = 0.0       # 当前 EWMA 平滑值
+        self.prev_ewma: float = 0.0  # 上一周期 EWMA（用于计算斜率）
+        self.hit_count: int = 0      # 当前批次命中次数（每批重置）
+        self.last_seen: float = 0.0  # 最后活跃时间戳
+
+
+class _KillChainDetector:
+    """
+    节点级杀伤链早期探测引擎（全局单例）。
+
+    核心公式：
+        S_t = α · X_t + (1 - α) · S_{t-1}
+        Trend = S_t - S_{t-1}
+
+    按 (ip, attack_type) 二元组独立维护 EWMA 状态。
+    每次广播时，按 attack_type 分组，取 Trend 最大的 Top N 节点输出。
+    """
+
+    def __init__(self, alpha: float = 0.3):
+        self.alpha = alpha
+        # OrderedDict 实现 LRU：最近访问的移到末尾，淘汰从头部开始
+        self._states: OrderedDict[tuple[str, str], _NodeEWMAState] = OrderedDict()
+
+    def feed_batch(self, records: list, predictions: list[dict], normal_label: str) -> dict:
+        """
+        喂入一个完整的微批数据，更新所有节点 EWMA 并输出高危排行榜。
+
+        Returns:
+            {
+                "DoS": [{"ip": "...", "trend": 0.85, "ewma": 1.2, "level": "Danger"}, ...],
+                "BruteForce": [{"ip": "...", "trend": 0.42, "ewma": 0.8, "level": "Warning"}, ...]
+            }
+        """
+        now = _time.time()
+
+        # --- Step 1: 统计本批次每个 (ip, attack_type) 的命中数 ---
+        batch_hits: dict[tuple[str, str], int] = {}
+        for i, pred in enumerate(predictions):
+            atype = pred["attack_type"]
+            if atype == normal_label:
+                continue
+            ip = records[i].source_ip
+            key = (ip, atype)
+            batch_hits[key] = batch_hits.get(key, 0) + 1
+
+        # --- Step 2: 更新有命中的节点 EWMA ---
+        for key, count in batch_hits.items():
+            state = self._states.get(key)
+            if state is None:
+                state = _NodeEWMAState()
+                state.ewma = float(count)
+                self._states[key] = state
+            else:
+                state.prev_ewma = state.ewma
+                state.ewma = self.alpha * count + (1 - self.alpha) * state.ewma
+                # LRU: 移到末尾
+                self._states.move_to_end(key)
+            state.hit_count = count
+            state.last_seen = now
+
+        # --- Step 3: 对本批没命中的活跃节点，EWMA 向 0 衰减 ---
+        for key, state in self._states.items():
+            if key not in batch_hits:
+                state.prev_ewma = state.ewma
+                state.ewma = (1 - self.alpha) * state.ewma
+                state.hit_count = 0
+
+        # --- Step 4: LRU 淘汰 ---
+        while len(self._states) > _MAX_TRACKED_NODES:
+            self._states.popitem(last=False)  # 移除最久未访问的
+
+        # --- Step 5: 按攻击类型分组，取 Top N ---
+        attack_groups: dict[str, list] = {}
+        for (ip, atype), state in self._states.items():
+            trend = state.ewma - state.prev_ewma
+            # 只选择有正向趋势或当前活跃的节点
+            if state.ewma < 0.1 and trend <= 0:
+                continue
+            if atype not in attack_groups:
+                attack_groups[atype] = []
+
+            # 判定威胁等级
+            if trend > 0.5 or state.ewma > 3.0:
+                level = "Danger"
+            elif trend > 0.1 or state.ewma > 1.0:
+                level = "Warning"
+            else:
+                level = "Watch"
+
+            attack_groups[atype].append({
+                "ip": ip,
+                "trend": round(trend, 3),
+                "ewma": round(state.ewma, 3),
+                "level": level,
+            })
+
+        # 每组按 EWMA 值降序排列，取 Top N
+        result = {}
+        for atype, nodes in attack_groups.items():
+            nodes.sort(key=lambda n: n["ewma"], reverse=True)
+            result[atype] = nodes[:_TOP_N]
+
+        return result
+
+
+# 全局单例
+_kill_chain_detector = _KillChainDetector()
+
+
+# =============================================================================
 # WebSocket 广播辅助协程
 # 由 asyncio.create_task 在事件循环中异步执行，不阻塞 HTTP 响应
 # =============================================================================
@@ -183,11 +321,15 @@ async def _broadcast_realtime_update(
     """
     构造并广播单批次实时告警包。
 
-    推送包结构：
+    推送包结构（V3.1 — 杀伤链探测升级）：
     {
         "type": "realtime_update",
         "timestamp": <int>,
         "batch_stats": { "total": N, "Normal": n, "DoS": n, "BruteForce": n },
+        "predicted_targets": {
+            "DoS": [{"ip": "...", "trend": 0.85, "ewma": 1.2, "level": "Danger"}, ...],
+            "BruteForce": [{"ip": "...", "trend": 0.42, "ewma": 0.8, "level": "Warning"}, ...]
+        },
         "alerts": [  // 仅非 Normal 的高危条目，最多 5 条
             { "ip": "...", "attack_type": "DoS", "confidence": 0.98 }
         ]
@@ -216,10 +358,16 @@ async def _broadcast_realtime_update(
             if predictions[i]["attack_type"] != normal_label
         ][:5]
 
+        # --- 节点级杀伤链早期探测 ---
+        predicted_targets = _kill_chain_detector.feed_batch(
+            records, predictions, normal_label
+        )
+
         payload = {
             "type": "realtime_update",
             "timestamp": timestamp,
             "batch_stats": batch_stats,
+            "predicted_targets": predicted_targets,
             "alerts": alerts,
         }
 

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import Dashboard from '@/views/Dashboard.vue';
 import Detect from '@/views/Detect.vue';
 import SopDashboard from '@/views/SopDashboard.vue';
+import AssetManager from '@/views/AssetManager.vue';
 
 const routes = [
   {
@@ -15,6 +16,15 @@ const routes = [
     meta: {
       title: '安全运营态势中心',
       icon: 'Monitor',
+    },
+  },
+  {
+    path: '/assets',
+    name: 'AssetManager',
+    component: AssetManager,
+    meta: {
+      title: '探针资产管理',
+      icon: 'Setting',
     },
   },
   {
@@ -38,7 +48,7 @@ const routes = [
 
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/dashboard',
+    redirect: '/sop',
   },
 ];
 

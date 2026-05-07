@@ -17,6 +17,10 @@
             <el-icon><Monitor /></el-icon>
             <span>安全运营态势</span>
           </el-menu-item>
+          <el-menu-item index="/assets">
+            <el-icon><Setting /></el-icon>
+            <span>终端节点管理</span>
+          </el-menu-item>
           <el-menu-item index="/dashboard">
             <el-icon><DataAnalysis /></el-icon>
             <span>学术分析大屏</span>
@@ -42,7 +46,11 @@
         </el-header>
         
         <el-main class="main-content">
-          <router-view />
+          <router-view v-slot="{ Component }">
+            <keep-alive>
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
         </el-main>
       </el-container>
     </el-container>
@@ -52,7 +60,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataAnalysis, Search, Monitor } from '@element-plus/icons-vue'
+import { DataAnalysis, Search, Monitor, Setting } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
@@ -63,6 +71,7 @@ const activeMenu = computed(() => route.path)
 const currentPageTitle = computed(() => {
   const routeMap = {
     '/sop':       '安全运营态势',
+    '/assets':    '终端节点管理',
     '/dashboard': '学术分析大屏',
     '/detect':    '攻击检测'
   }
