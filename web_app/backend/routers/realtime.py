@@ -191,7 +191,7 @@ from collections import OrderedDict
 # 最多追踪的 (ip, attack_type) 组合数量
 _MAX_TRACKED_NODES = 500
 # 每种攻击类型输出的高危节点数
-_TOP_N = 3
+_TOP_N = 6
 
 
 class _NodeEWMAState:
@@ -274,16 +274,16 @@ class _KillChainDetector:
         attack_groups: dict[str, list] = {}
         for (ip, atype), state in self._states.items():
             trend = state.ewma - state.prev_ewma
-            # 只选择有正向趋势或当前活跃的节点
-            if state.ewma < 0.1 and trend <= 0:
+            # 只选择 EWMA 达到展示阈值的节点
+            if state.ewma < 0.4:
                 continue
             if atype not in attack_groups:
                 attack_groups[atype] = []
 
-            # 判定威胁等级
-            if trend > 0.5 or state.ewma > 3.0:
+            # 判定威胁等级（严格按照业务规范）
+            if state.ewma > 0.9:
                 level = "Danger"
-            elif trend > 0.1 or state.ewma > 1.0:
+            elif state.ewma > 0.7:
                 level = "Warning"
             else:
                 level = "Watch"

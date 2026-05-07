@@ -10,7 +10,7 @@
       <div class="top-bar-right">
         <!-- 被动雷达开关（替代原有攻击选择沙盘） -->
         <div class="radar-switch">
-          <span class="radar-label">📡 全路段雷达监测</span>
+          <span class="radar-label"><Aim class="panel-icon" /> 全路段雷达监测</span>
           <el-switch
             v-model="radarActive"
             active-text="运行"
@@ -49,7 +49,7 @@
     <div class="map-section">
       <div class="panel panel-map">
         <div class="panel-header">
-          <span class="panel-title">🗺️ 全国终端节点态势感知</span>
+          <span class="panel-title"><Place class="panel-icon" /> 全国终端节点态势感知</span>
           <span class="panel-sub">{{ mapNodeCount }} 个终端节点 · 实时威胁联动</span>
         </div>
         <div ref="mapChartRef" class="map-container"></div>
@@ -64,7 +64,7 @@
         <!-- 左：攻击趋势折线图 -->
         <div class="panel panel-chart">
           <div class="panel-header">
-            <span class="panel-title">📈 实时攻击频次</span>
+            <span class="panel-title"><TrendCharts class="panel-icon" /> 实时攻击频次</span>
             <span class="panel-sub">基于微批窗口的攻击条数统计</span>
           </div>
           <div ref="chartRef" class="chart-container"></div>
@@ -73,7 +73,7 @@
         <!-- 右：攻击类型分布饼图 -->
         <div class="panel panel-pie">
           <div class="panel-header">
-            <span class="panel-title">🎯 攻击类型分布</span>
+            <span class="panel-title"><PieChart class="panel-icon" /> 攻击类型分布</span>
             <span class="panel-sub">实时占比统计</span>
           </div>
           <div ref="pieChartRef" class="chart-container"></div>
@@ -85,9 +85,9 @@
         <!-- DoS 洪峰预警榜 -->
         <div class="threat-board threat-dos">
           <div class="tb-header">
-            <span class="tb-icon">🔴</span>
-            <span class="tb-title">DoS 洪峰预警</span>
-            <span class="tb-sub">高危受击节点 Top 3</span>
+            <span class="tb-icon"><WarningFilled color="#f56c6c" /></span>
+            <span class="tb-title">DoS 洪峰预测</span>
+            <span class="tb-sub">高危攻击节点 Top 6</span>
           </div>
           <div class="tb-body">
             <div v-if="predictedTargets.DoS.length === 0" class="tb-empty">暂无高危节点</div>
@@ -99,10 +99,10 @@
             >
               <span class="tb-rank">{{ idx + 1 }}</span>
               <span class="tb-ip">{{ node.ip }}</span>
-              <el-tag :type="node.level === 'Danger' ? 'danger' : 'warning'" size="small" effect="dark" class="tb-tag">
-                {{ node.level === 'Danger' ? '⚠ 洪峰' : node.level === 'Warning' ? '↑ 升温' : '◉ 观察' }}
+              <el-tag :type="node.level === 'Danger' ? 'danger' : node.level === 'Warning' ? 'warning' : 'info'" size="small" effect="plain" class="tb-tag">
+                {{ node.level === 'Danger' ? '高危' : node.level === 'Warning' ? '升温' : '观察' }}
               </el-tag>
-              <el-button type="danger" size="small" text class="tb-action" @click="blockByIp(node.ip)">封禁 ⚡</el-button>
+              <el-button v-if="node.level === 'Danger'" type="danger" size="small" text class="tb-action" @click="blockByIp(node.ip)">封禁 <CircleClose class="btn-icon" /></el-button>
             </div>
           </div>
         </div>
@@ -110,9 +110,9 @@
         <!-- BruteForce 爆破预警榜 -->
         <div class="threat-board threat-bf">
           <div class="tb-header">
-            <span class="tb-icon">🟠</span>
-            <span class="tb-title">BruteForce 爆破预警</span>
-            <span class="tb-sub">高危受击节点 Top 3</span>
+            <span class="tb-icon"><WarningFilled color="#e6a23c" /></span>
+            <span class="tb-title">BruteForce 爆破预测</span>
+            <span class="tb-sub">高危攻击节点 Top 6</span>
           </div>
           <div class="tb-body">
             <div v-if="predictedTargets.BruteForce.length === 0" class="tb-empty">暂无高危节点</div>
@@ -124,10 +124,10 @@
             >
               <span class="tb-rank">{{ idx + 1 }}</span>
               <span class="tb-ip">{{ node.ip }}</span>
-              <el-tag :type="node.level === 'Danger' ? 'danger' : 'warning'" size="small" effect="dark" class="tb-tag">
-                {{ node.level === 'Danger' ? '⚠ 爆发' : node.level === 'Warning' ? '↑ 升温' : '◉ 观察' }}
+              <el-tag :type="node.level === 'Danger' ? 'danger' : node.level === 'Warning' ? 'warning' : 'info'" size="small" effect="plain" class="tb-tag">
+                {{ node.level === 'Danger' ? '高危' : node.level === 'Warning' ? '升温' : '观察' }}
               </el-tag>
-              <el-button type="danger" size="small" text class="tb-action" @click="blockByIp(node.ip)">封禁 ⚡</el-button>
+              <el-button v-if="node.level === 'Danger'" type="danger" size="small" text class="tb-action" @click="blockByIp(node.ip)">封禁 <CircleClose class="btn-icon" /></el-button>
             </div>
           </div>
         </div>
@@ -135,7 +135,7 @@
         <!-- 实时高危告警列表 -->
         <div class="panel panel-alerts">
           <div class="panel-header">
-            <span class="panel-title">🚨 实时高危告警</span>
+            <span class="panel-title"><WarningFilled class="panel-icon" /> 实时高危告警</span>
             <el-tag size="small" type="danger" effect="plain">{{ alertList.length }} 条</el-tag>
           </div>
 
@@ -151,7 +151,7 @@
                   <el-tag
                     :type="alert.attack_type === 'DoS' ? 'danger' : 'warning'"
                     size="small"
-                    effect="dark"
+                    effect="plain"
                     class="alert-badge"
                   >{{ alert.attack_type }}</el-tag>
                   <span class="alert-ip">{{ alert.ip }}</span>
@@ -174,7 +174,7 @@
                     class="handle-btn"
                     @click="blockByIp(alert.ip)"
                   >
-                    一键封禁 ⚡
+                    一键封禁 <CircleClose class="btn-icon" />
                   </el-button>
                 </div>
               </div>
@@ -197,6 +197,8 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Aim, Place, TrendCharts, PieChart, WarningFilled, CircleClose } from '@element-plus/icons-vue'
+
 
 const router = useRouter()
 
@@ -226,10 +228,10 @@ async function handleRadarToggle(active) {
   try {
     if (active) {
       await axios.post(`${API_BASE}/simulator/start`)
-      ElMessage.success('📡 雷达已启动，正在监测全路段真实流量...')
+      ElMessage.success('雷达已启动，正在监测全路段真实流量...')
     } else {
       await axios.post(`${API_BASE}/simulator/stop`)
-      ElMessage.info('⏹ 雷达已关闭')
+      ElMessage.info('雷达已关闭')
     }
   } catch (e) {
     ElMessage.error(`操作失败：${e.response?.data?.detail || e.message}`)
@@ -246,14 +248,14 @@ async function blockByIp(ip) {
   try {
     await ElMessageBox.confirm(
       `确认封禁节点 ${ip} 吗？封禁后可在「终端节点管理」页面解封。`,
-      '⚡ 一键封禁',
+      '一键封禁',
       { type: 'warning', confirmButtonText: '立即封禁', cancelButtonText: '取消' }
     )
     const res = await axios.post(`${API_BASE}/assets/block-by-ip`, { ip })
     if (res.data.already_blocked) {
       ElMessage.warning(`${ip} 已处于封禁状态`)
     } else {
-      ElMessage.success(`🔒 已封禁：${res.data.message}`)
+      ElMessage.success(`已封禁：${res.data.message}`)
     }
   } catch (e) {
     if (e === 'cancel' || e?.toString?.().includes('cancel')) return
@@ -1060,4 +1062,24 @@ onBeforeUnmount(() => {
 .alert-list::-webkit-scrollbar { width: 4px; }
 .alert-list::-webkit-scrollbar-track { background: transparent; }
 .alert-list::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 2px; }
+
+.panel-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  vertical-align: -3px;
+  color: #a3b8d0;
+}
+.tb-icon svg {
+  width: 18px;
+  height: 18px;
+  vertical-align: -3px;
+}
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  vertical-align: -2px;
+}
+
 </style>

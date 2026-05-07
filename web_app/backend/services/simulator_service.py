@@ -80,19 +80,36 @@ class ReplayEngine:
 
     def get_mixed_batch(self, batch_size: int) -> list[dict]:
         """
-        从各类别中按真实数据集比例提取混合切片。
-        混合策略：按各类别在数据集中的实际占比分配本批次条数，
-        模拟真实网络中正常流量为主、攻击流量散布其中的自然分布。
+        从各类别中按稳健比例提取混合切片。
+        根据用户配置：
+        - Normal: 90~95%
+        - 剩余的攻击流量中，DoS 约占 80%，BruteForce 约占 20%
         """
         if not self._loaded or self.total_records == 0:
             return []
 
         records = []
+        
+        # 动态计算本批次配额
+        normal_ratio = random.uniform(0.90, 0.95)
+        attack_ratio = 1.0 - normal_ratio
+
         for label_int, df in self.dfs.items():
             if df.empty:
                 continue
-            # 按实际数据占比分配条数
-            ratio = len(df) / self.total_records
+                
+            label_name = ATTACK_LABEL_MAP.get(label_int, "Unknown")
+            
+            # 按预设展示效果分配占比
+            if label_name == "Normal":
+                ratio = normal_ratio
+            elif label_name == "DoS":
+                ratio = attack_ratio * 0.8
+            elif label_name == "BruteForce":
+                ratio = attack_ratio * 0.2
+            else:
+                ratio = 0.0
+
             count = max(1, int(batch_size * ratio))
 
             cursor = self.cursors.get(label_int, 0)

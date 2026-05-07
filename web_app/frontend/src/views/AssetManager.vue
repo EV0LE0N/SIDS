@@ -4,7 +4,7 @@
     <!-- ===== 页面标题与搜索栏 ===== -->
     <div class="page-header">
       <div class="header-left">
-        <h2 class="page-title">🛡️ 终端节点管理</h2>
+        <h2 class="page-title"><Monitor class="title-icon" /> 终端节点管理</h2>
         <span class="page-desc">运行中 {{ activeNodes.length }} · 已封禁 {{ blockedNodes.length }}</span>
       </div>
       <div class="header-right">
@@ -25,7 +25,7 @@
       <!-- 正常运行节点表格 -->
       <div class="table-section">
         <div class="section-header">
-          <span class="section-title">🟢 运行中节点</span>
+          <span class="section-title"><CircleCheckFilled class="section-icon" color="#67c23a" /> 运行中节点</span>
           <el-tag type="success" size="small" effect="plain">{{ activeNodes.length }} 个</el-tag>
         </div>
         <div class="table-wrapper">
@@ -63,7 +63,7 @@
       <!-- 已封禁节点表格 -->
       <div class="table-section section-blocked">
         <div class="section-header">
-          <span class="section-title">🔴 已封禁节点</span>
+          <span class="section-title"><CircleCloseFilled class="section-icon" color="#f56c6c" /> 已封禁节点</span>
           <el-tag type="danger" size="small" effect="plain">{{ blockedNodes.length }} 个</el-tag>
         </div>
         <div class="table-wrapper">
@@ -329,4 +329,19 @@ onActivated(() => {
   color: #c0c4cc;
   font-size: 13px;
 }
+
+.title-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  vertical-align: -4px;
+  color: #a3b8d0;
+}
+.section-icon {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  vertical-align: -3px;
+}
+
 </style>
