@@ -10,7 +10,7 @@
       <div class="header-right">
         <el-input
           v-model="searchKeyword"
-          placeholder="搜索 IP / 节点名 / 责任人..."
+          placeholder="搜索 IP / 节点名 / 用户..."
           :prefix-icon="Search"
           clearable
           style="width: 260px"
@@ -38,14 +38,14 @@
             height="100%"
           >
             <el-table-column prop="id" label="节点 ID" width="90" />
-            <el-table-column prop="node_name" label="服务器名称" min-width="160" />
+            <el-table-column prop="node_name" label="节点名称" min-width="160" />
             <el-table-column prop="ip_address" label="IP 地址" width="150">
               <template #default="{ row }">
                 <span class="mono-text">{{ row.ip_address }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="location" label="部署地点" width="100" />
-            <el-table-column prop="owner" label="责任人" width="80" />
+            <el-table-column prop="owner" label="用户" width="80" />
             <el-table-column label="操作" width="160" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button type="danger" size="small" text @click="toggleBlock(row)">
@@ -76,14 +76,14 @@
             height="100%"
           >
             <el-table-column prop="id" label="节点 ID" width="90" />
-            <el-table-column prop="node_name" label="服务器名称" min-width="160" />
+            <el-table-column prop="node_name" label="节点名称" min-width="160" />
             <el-table-column prop="ip_address" label="IP 地址" width="150">
               <template #default="{ row }">
                 <span class="mono-text blocked-ip">{{ row.ip_address }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="location" label="部署地点" width="100" />
-            <el-table-column prop="owner" label="责任人" width="80" />
+            <el-table-column prop="owner" label="用户" width="80" />
             <el-table-column label="操作" width="120" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button type="success" size="small" text @click="toggleBlock(row)">
@@ -110,10 +110,10 @@
         <el-form-item label="节点 ID">
           <el-input :model-value="editForm.id" disabled />
         </el-form-item>
-        <el-form-item label="服务器名">
+        <el-form-item label="节点名称">
           <el-input v-model="editForm.node_name" />
         </el-form-item>
-        <el-form-item label="责任人">
+        <el-form-item label="用户">
           <el-input v-model="editForm.owner" />
         </el-form-item>
       </el-form>

@@ -1,6 +1,12 @@
 <template>
   <div id="app">
-    <el-container class="app-container">
+    <!-- 如果是登录页，直接渲染整个路由视图，没有任何侧边栏包装 -->
+    <template v-if="route.path === '/login'">
+      <router-view />
+    </template>
+    
+    <!-- 主框架布局，仅在非登录页显示 -->
+    <el-container v-else class="app-container">
       <!-- 侧边栏导航 -->
       <el-aside width="200px" class="sidebar">
         <div class="logo">
@@ -36,12 +42,16 @@
       <!-- 主内容区 -->
       <el-container>
         <el-header class="header">
-          <div class="header-content">
+          <div class="header-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
             <el-breadcrumb separator="/">
               <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
               <el-breadcrumb-item>{{ currentPageTitle }}</el-breadcrumb-item>
             </el-breadcrumb>
-
+            <div class="user-actions">
+              <el-button type="danger" size="small" plain @click="handleLogout">
+                退出系统
+              </el-button>
+            </div>
           </div>
         </el-header>
         
@@ -83,6 +93,14 @@ const currentPageTitle = computed(() => {
 // 菜单选择处理
 const handleMenuSelect = (index) => {
   console.log('导航到:', index)
+}
+
+// 退出登录
+const handleLogout = () => {
+  localStorage.removeItem('sids_token')
+  localStorage.removeItem('sids_user')
+  route.meta.public = true // 临时放行
+  window.location.href = '/login'
 }
 </script>
 

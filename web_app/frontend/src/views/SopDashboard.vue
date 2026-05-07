@@ -45,6 +45,17 @@
       </div>
     </div>
 
+    <!-- ===== 中国态势感知地图 ===== -->
+    <div class="map-section">
+      <div class="panel panel-map">
+        <div class="panel-header">
+          <span class="panel-title">🗺️ 全国终端节点态势感知</span>
+          <span class="panel-sub">{{ mapNodeCount }} 个终端节点 · 实时威胁联动</span>
+        </div>
+        <div ref="mapChartRef" class="map-container"></div>
+      </div>
+    </div>
+
     <!-- ===== 主体区域：上下两行布局 ===== -->
     <div class="main-body">
 
@@ -197,6 +208,13 @@ const API_BASE = 'http://localhost:8000/api'
 const MAX_TREND_POINTS = 30
 const MAX_ALERTS = 50
 
+// china.json CDN 候选列表（运行时动态加载，按顺序尝试）
+const CHINA_JSON_URLS = [
+  './china.json',
+  'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json',
+  'https://cdn.jsdelivr.net/npm/echarts-countries-js/china.json',
+]
+
 // ─────────────────────────────────────────────
 // 被动雷达开关（替代原有仿真沙盘）
 // ─────────────────────────────────────────────
@@ -227,7 +245,7 @@ async function handleRadarToggle(active) {
 async function blockByIp(ip) {
   try {
     await ElMessageBox.confirm(
-      `确认封禁节点 ${ip} 吗？封禁后可在「探针资产管理」页面解封。`,
+      `确认封禁节点 ${ip} 吗？封禁后可在「终端节点管理」页面解封。`,
       '⚡ 一键封禁',
       { type: 'warning', confirmButtonText: '立即封禁', cancelButtonText: '取消' }
     )
@@ -241,6 +259,197 @@ async function blockByIp(ip) {
     if (e === 'cancel' || e?.toString?.().includes('cancel')) return
     ElMessage.error(`封禁失败：${e.response?.data?.detail || e.message}`)
   }
+}
+
+// ─────────────────────────────────────────────
+// 中国态势感知地图
+// ─────────────────────────────────────────────
+const mapChartRef = ref(null)
+let mapChartInstance = null
+const mapNodeCount = ref(0)
+
+// 节点基础数据缓存 { ip -> {name, lng, lat} }
+let nodeGeoMap = {}
+
+// 当前地图上的告警散点集合 { ip -> { attack_type, confidence, timestamp } }
+const activeAlertIPs = reactive({})
+
+async function loadChinaJson() {
+  for (const url of CHINA_JSON_URLS) {
+    try {
+      const res = await fetch(url)
+      if (res.ok) {
+        const json = await res.json()
+        return json
+      }
+    } catch { /* try next */ }
+  }
+  console.warn('[地图] 所有 china.json 源均不可用，地图底图将缺失')
+  return null
+}
+
+async function initMapChart() {
+  if (!mapChartRef.value) return
+
+  // 1. 加载中国地图 GeoJSON
+  const chinaJson = await loadChinaJson()
+  if (chinaJson) {
+    echarts.registerMap('china', chinaJson)
+  }
+
+  // 2. 加载 50 个终端节点坐标
+  let nodeList = []
+  try {
+    const res = await axios.get(`${API_BASE}/assets/nodes`)
+    nodeList = res.data.nodes || []
+  } catch (e) {
+    console.warn('[地图] 加载节点列表失败:', e)
+  }
+
+  mapNodeCount.value = nodeList.length
+
+  // 构建 IP -> 坐标映射表
+  nodeGeoMap = {}
+  nodeList.forEach(n => {
+    nodeGeoMap[n.ip_address] = { name: n.node_name, lng: n.lng, lat: n.lat, location: n.location }
+  })
+
+  // 底色散点：全部 30 个省会节点（深蓝色静态散点）
+  const baseScatter = nodeList.map(n => ({
+    name: n.node_name,
+    value: [n.lng, n.lat, 10],
+    ip: n.ip_address,
+    location: n.location,
+  }))
+
+  mapChartInstance = echarts.init(mapChartRef.value)
+
+  const option = {
+    backgroundColor: '#ffffff',
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => {
+        if (p.data?.ip) {
+          const loc = p.data.location || ''
+          return `<div style="font-size:13px;"><b>${p.data.name}</b><br/>IP: ${p.data.ip}<br/>位置: ${loc}</div>`
+        }
+        return p.name || ''
+      },
+    },
+    geo: chinaJson ? {
+      map: 'china',
+      roam: true,
+      zoom: 1.5,
+      center: [104.5, 35],
+      scaleLimit: {
+        min: 1,   // 防止缩成一个点
+        max: 2    // 防止放大过度
+      },
+      label: { show: false },
+      itemStyle: {
+        areaColor: '#e8edf4',
+        borderColor: '#a3b8d0',
+        borderWidth: 1,
+      },
+      emphasis: {
+        itemStyle: {
+          areaColor: '#d0dcea',
+          borderColor: '#6a9fd4',
+        },
+        label: { show: false },
+      },
+    } : undefined,
+    series: [
+      // Layer 1: 底色散点（全部节点，深蓝色）
+      {
+        name: '终端节点',
+        type: 'scatter',
+        coordinateSystem: 'geo',
+        data: baseScatter,
+        symbolSize: 10,
+        itemStyle: {
+          color: '#2b7ce9',
+          shadowBlur: 8,
+          shadowColor: 'rgba(43,124,233,0.5)',
+        },
+        zlevel: 1,
+      },
+      // Layer 2: SOC 指挥中心（北京）
+      {
+        name: '指挥中心',
+        type: 'effectScatter',
+        coordinateSystem: 'geo',
+        data: [{ name: '北京 (SOC 指挥中心)', value: [116.407, 39.904, 100], location: '北京' }],
+        symbolSize: 16,
+        showEffectOn: 'render',
+        rippleEffect: { brushType: 'stroke', scale: 3, period: 4 },
+        itemStyle: {
+          color: '#67c23a',
+          shadowBlur: 10,
+          shadowColor: 'rgba(103,194,58,0.8)'
+        },
+        zlevel: 3,
+      },
+      // Layer 3: 流量飞线（动态，由 WebSocket 驱动）
+      {
+        name: '流量飞线',
+        type: 'lines',
+        coordinateSystem: 'geo',
+        zlevel: 2,
+        animation: false, // 核心修复：禁用线条坐标更新时的过渡动画，防止扫射
+        effect: {
+          show: true,
+          period: 3,
+          trailLength: 0.3,
+          symbolSize: 5,
+        },
+        lineStyle: {
+          width: 1.5,
+          opacity: 0.4,
+          curveness: 0.2
+        },
+        data: [],
+      },
+    ],
+  }
+
+  mapChartInstance.setOption(option)
+}
+
+// 地图飞线联动：仅高亮当前批次中的流量节点
+// 若无事件，则清空地图飞线
+function updateMapAlerts(events) {
+  if (!mapChartInstance) return
+
+  if (!events || events.length === 0) {
+    mapChartInstance.setOption({ series: [{}, {}, { data: [] }] })
+    return
+  }
+
+  const BEIJING_COORD = [116.407, 39.904]
+  const linesData = []
+
+  events.forEach(e => {
+    const geo = nodeGeoMap[e.ip]
+    if (!geo) return
+
+    let lineColor = '#409eff' // Normal 蓝色
+    if (e.attack_type === 'DoS') lineColor = '#f56c6c' // 红色
+    else if (e.attack_type === 'BruteForce') lineColor = '#e6a23c' // 黄色
+
+    linesData.push({
+      fromName: geo.name,
+      toName: '北京 (SOC 指挥中心)',
+      coords: [
+        [geo.lng, geo.lat],
+        BEIJING_COORD
+      ],
+      lineStyle: { color: lineColor }
+    })
+  })
+
+  // 更新第三个 series (lines)
+  mapChartInstance.setOption({ series: [{}, {}, { data: linesData }] })
 }
 
 // ─────────────────────────────────────────────
@@ -465,7 +674,12 @@ function handleMessage(raw) {
     predictedTargets.BruteForce = data.predicted_targets.BruteForce || []
   }
 
-  pushAlerts(data.alerts || [])
+  const newAlerts = data.alerts || []
+  pushAlerts(newAlerts)
+
+  // 优先使用专门给大屏绘制用的混杂事件队列（包含正常流量）；否则回退到单纯告警
+  const trafficEvents = data.traffic_events || newAlerts
+  updateMapAlerts(trafficEvents)
 }
 
 // ─────────────────────────────────────────────
@@ -503,11 +717,13 @@ function disconnectWS() {
 function handleResize() {
   chartInstance?.resize()
   pieChartInstance?.resize()
+  mapChartInstance?.resize()
 }
 
-onMounted(() => {
+onMounted(async () => {
   initChart()
   initPieChart()
+  await initMapChart()
   connectWS()
   window.addEventListener('resize', handleResize)
 })
@@ -517,6 +733,7 @@ onActivated(() => {
   nextTick(() => {
     chartInstance?.resize()
     pieChartInstance?.resize()
+    mapChartInstance?.resize()
   })
 })
 
@@ -526,15 +743,18 @@ onBeforeUnmount(() => {
   chartInstance = null
   pieChartInstance?.dispose()
   pieChartInstance = null
+  mapChartInstance?.dispose()
+  mapChartInstance = null
   window.removeEventListener('resize', handleResize)
 })
 </script>
 
 <style scoped>
-/* ── 整体页面：明亮白底 ── */
+/* ── 整体页面：可滚动的全高布局 ── */
 .sop-dashboard {
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;  /* 防止滚动条出现/消失导致横向抨动 */
   background: #f5f7fa;
   color: #303133;
   padding: 0;
@@ -542,6 +762,29 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* ── 地图区域 ── */
+.map-section {
+  padding: 0 20px;
+}
+.panel-map {
+  background: #ffffff;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+.panel-map .panel-header {
+  background: #fafafa;
+  border-bottom: 1px solid #f2f3f5;
+}
+.panel-map .panel-title { color: #303133; }
+.panel-map .panel-sub { color: #909399; }
+.map-container {
+  height: 480px;
+  width: 100%;
+  background: #ffffff;
 }
 
 /* ── 顶部状态栏 ── */
@@ -627,8 +870,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 14px;
   padding: 0 20px 20px;
-  flex: 1;
-  min-height: 0;
+  flex-shrink: 0;
 }
 
 /* ── 上行：折线图（2份） + 饼图（1份） ── */
@@ -645,8 +887,8 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: 1fr 1fr 1.2fr;
   gap: 14px;
-  flex: 1;
-  min-height: 0;
+  height: 340px;   /* 固定高度，防止告警列表把整行撑高 */
+  flex-shrink: 0;
 }
 
 .threat-board {
@@ -755,12 +997,18 @@ onBeforeUnmount(() => {
 .chart-container { flex: 1; min-height: 280px; }
 
 /* ── 告警列表 ── */
-.panel-alerts { min-height: 0; }
+.panel-alerts {
+  min-height: 0;
+  overflow: hidden;  /* 让子元素的 flex + overflow-y 生效 */
+  display: flex;
+  flex-direction: column;
+}
 
 .alert-list {
   flex: 1;
   overflow-y: auto;
   padding: 8px;
+  min-height: 0;     /* 关键：flex 子元素若不写 min-height:0，overflow-y 会失效 */
   display: flex;
   flex-direction: column;
   gap: 6px;

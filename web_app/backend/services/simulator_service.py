@@ -26,9 +26,9 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 from utils import CORE_FEATURES, ATTACK_LABEL_MAP
 
-# 封闭局域网 50 节点 IP 池（与 routers/assets.py 中的节点 IP 完全一致）
+# 封闭局域网 30 节点 IP 池（与 routers/assets.py 中的 30 省会节点完全一致）
 # 所有回放流量的 source_ip 都将从此池中随机选取，确保 100% 命中节点库
-_NODE_IP_POOL = [f"192.168.1.{i+1}" for i in range(50)]
+_NODE_IP_POOL = [f"192.168.1.{i+1}" for i in range(30)]
 
 logger = logging.getLogger(__name__)
 

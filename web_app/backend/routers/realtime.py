@@ -337,6 +337,7 @@ async def _broadcast_realtime_update(
 
     "正常流量"类型名从 ATTACK_LABEL_MAP[0] 动态读取，禁止硬编码。
     """
+    import random
     try:
         # --- 动态构建批次统计，键从 ATTACK_LABEL_MAP 读取 ---
         normal_label = ATTACK_LABEL_MAP[0]   # 当前为 "Normal"，未来可能变化
@@ -358,6 +359,17 @@ async def _broadcast_realtime_update(
             if predictions[i]["attack_type"] != normal_label
         ][:5]
 
+        # --- 提取用于大屏飞线动画的随机流量事件（最多15条，含正常与攻击） ---
+        traffic_events = [
+            {
+                "ip": records[i].source_ip,
+                "attack_type": predictions[i]["attack_type"]
+            }
+            for i in range(len(predictions))
+        ]
+        if len(traffic_events) > 15:
+            traffic_events = random.sample(traffic_events, 15)
+
         # --- 节点级杀伤链早期探测 ---
         predicted_targets = _kill_chain_detector.feed_batch(
             records, predictions, normal_label
@@ -369,6 +381,7 @@ async def _broadcast_realtime_update(
             "batch_stats": batch_stats,
             "predicted_targets": predicted_targets,
             "alerts": alerts,
+            "traffic_events": traffic_events,
         }
 
         await ws_manager.broadcast(payload)

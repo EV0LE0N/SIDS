@@ -47,12 +47,15 @@ app.add_middleware(
     max_age=3600
 )
 
+from routers import stats, predict, realtime, simulator, ws, assets, auth
+
 # 注册路由
 app.include_router(stats.router, prefix="/api")
 app.include_router(predict.router, prefix="/api")
 app.include_router(realtime.router, prefix="/api")
 app.include_router(simulator.router, prefix="/api")
 app.include_router(assets.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 app.include_router(ws.router)   # WebSocket 路由：无 /api 前缀，路径为 /ws/alerts
 
 # 健康检查 (增强版)
